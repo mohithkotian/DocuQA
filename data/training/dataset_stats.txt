@@ -1,0 +1,46 @@
+==================================================================
+DOCUQA CRICKET QA TRAINING DATASET — PHASE 1 QUALITY CLEANED
+==================================================================
+Total Examples:         571
+Answerable Examples:    501 (87.74%)
+Unanswerable Examples:  70 (12.26%)
+
+--- Quality & Constraint Compliance ---
+  [PASS] Total within range (500 <= 571 <= 700): TRUE
+  [PASS] Unanswerable ratio within range (8.0% <= 12.26% <= 15.0%): TRUE
+  [PASS] All 8 documents in data/documents/ fully represented: TRUE (8/8)
+  [PASS] Zero meta-questions (corpus/document/collection/limitations): VERIFIED
+  [PASS] Zero duplicate questions and zero near-duplicate questions: VERIFIED
+  [PASS] 100% exact character span verification for answerable questions: VERIFIED
+  [PASS] Held-out benchmark data/evaluation/questions.json isolated: VERIFIED
+
+--- Question Type Breakdown ---
+  - rule           : 108 (18.91%)
+  - definition     :  77 (13.49%)
+  - role           :  76 (13.31%)
+  - unanswerable   :  70 (12.26%)
+  - condition      :  58 (10.16%)
+  - numeric        :  53 (9.28%)
+  - position       :  40 (7.01%)
+  - procedure      :  23 (4.03%)
+  - purpose        :  22 (3.85%)
+  - description    :  18 (3.15%)
+  - list           :  17 (2.98%)
+  - format         :   7 (1.23%)
+  - duration       :   2 (0.35%)
+
+--- Document Distribution (Strictly 8 Canonical Documents) ---
+  - 01_laws_and_rules.md     :  74 examples
+  - 02_batting.md            :  72 examples
+  - 03_bowling.md            :  72 examples
+  - 04_fielding.md           :  72 examples
+  - 05_scoring.md            :  72 examples
+  - 06_match_structure.md    :  72 examples
+  - 07_players_and_teams.md  :  72 examples
+  - 08_tournaments.md        :  65 examples
+
+--- Answer Length Statistics (Words) ---
+  - Average: 4.44 words
+  - Min:     1 words
+  - Max:     23 words
+==================================================================

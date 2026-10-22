@@ -1,0 +1,5 @@
+Cricket Pitch and Scoring
+
+The pitch is a rectangular strip in the centre of the field. It is 22 yards long, with a set of three stumps at each end.
+
+A batter can score runs by running between the wickets. A boundary scored after the ball reaches the ground is worth four runs. If the ball crosses the boundary without bouncing, it is worth six runs.

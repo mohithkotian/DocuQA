@@ -1,0 +1,134 @@
+{
+  "base_model": "deepset/minilm-uncased-squad2",
+  "fine_tuned_model": "models\\docuqa-minilm-cricket",
+  "training_dataset": "data\\training\\cricket_qa_train.json",
+  "seed": 42,
+  "epochs": 2,
+  "learning_rate": 3e-05,
+  "batch_size": 4,
+  "eval_batch_size": 4,
+  "weight_decay": 0.01,
+  "warmup_ratio": 0.1,
+  "train_examples": 457,
+  "validation_examples": 57,
+  "internal_test_examples": 57,
+  "training_stats": {
+    "train": {
+      "original_examples": 457,
+      "tokenized_features": 457,
+      "answerable_examples": 401,
+      "unanswerable_examples": 56,
+      "overflow_features": 0,
+      "valid_answer_spans": 401,
+      "dropped_examples": 0
+    },
+    "val": {
+      "original_examples": 57,
+      "tokenized_features": 57,
+      "answerable_examples": 50,
+      "unanswerable_examples": 7,
+      "overflow_features": 0,
+      "valid_answer_spans": 50,
+      "dropped_examples": 0
+    },
+    "test": {
+      "original_examples": 57,
+      "tokenized_features": 57,
+      "answerable_examples": 50,
+      "unanswerable_examples": 7,
+      "overflow_features": 0,
+      "valid_answer_spans": 50,
+      "dropped_examples": 0
+    },
+    "train_loss_history": [
+      1.0187820394887872,
+      0.540937342154591
+    ],
+    "val_loss_history": [
+      0.7887219876050949,
+      0.7560221369067828
+    ],
+    "total_training_time_seconds": 1578.520985841751
+  },
+  "internal_test_metrics": {
+    "exact_match": 0.6666666666666666,
+    "token_f1": 0.8084985190248348
+  },
+  "baseline_metrics": {
+    "TF-IDF": {
+      "exact_match": 0.484375,
+      "token_f1": 0.7397185780711806,
+      "answerable_accuracy": 0.4074074074074074,
+      "answerable_success": 0.8148148148148148,
+      "abstention_accuracy": 0.9,
+      "overall_abstention_correct": 0.921875,
+      "source_accuracy": 0.8703703703703703,
+      "evidence_validity": 1.0
+    },
+    "BM25": {
+      "exact_match": 0.484375,
+      "token_f1": 0.7397185780711806,
+      "answerable_accuracy": 0.42592592592592593,
+      "answerable_success": 0.8333333333333334,
+      "abstention_accuracy": 0.8,
+      "overall_abstention_correct": 0.921875,
+      "source_accuracy": 0.8888888888888888,
+      "evidence_validity": 1.0
+    }
+  },
+  "finetuned_metrics": {
+    "TF-IDF": {
+      "exact_match": 0.640625,
+      "token_f1": 0.8368582965828032,
+      "answerable_accuracy": 0.5740740740740741,
+      "answerable_success": 0.7407407407407407,
+      "abstention_accuracy": 1.0,
+      "overall_abstention_correct": 0.984375,
+      "source_accuracy": 0.8888888888888888,
+      "evidence_validity": 1.0
+    },
+    "BM25": {
+      "exact_match": 0.671875,
+      "token_f1": 0.8649832965828032,
+      "answerable_accuracy": 0.6111111111111112,
+      "answerable_success": 0.7777777777777778,
+      "abstention_accuracy": 1.0,
+      "overall_abstention_correct": 0.984375,
+      "source_accuracy": 0.9259259259259259,
+      "evidence_validity": 1.0
+    }
+  },
+  "improvement": {
+    "TF-IDF": {
+      "exact_match": 0.15625,
+      "token_f1": 0.09713971851162262,
+      "answerable_accuracy": 0.16666666666666669,
+      "answerable_success": -0.07407407407407407,
+      "abstention_accuracy": 0.09999999999999998,
+      "overall_abstention_correct": 0.0625,
+      "source_accuracy": 0.01851851851851849,
+      "evidence_validity": 0.0
+    },
+    "BM25": {
+      "exact_match": 0.1875,
+      "token_f1": 0.12526471851162257,
+      "answerable_accuracy": 0.18518518518518523,
+      "answerable_success": -0.05555555555555558,
+      "abstention_accuracy": 0.19999999999999996,
+      "overall_abstention_correct": 0.0625,
+      "source_accuracy": 0.03703703703703709,
+      "evidence_validity": 0.0
+    }
+  },
+  "overfitting": false,
+  "reproducibility": {
+    "python_version": "3.14.3 (tags/v3.14.3:323c59a, Feb  3 2026, 16:04:56) [MSC v.1944 64 bit (AMD64)]",
+    "transformers_version": "4.57.6",
+    "torch_version": "2.14.1+cpu",
+    "device": "cpu",
+    "cpu_architecture": "Intel64 Family 6 Model 154 Stepping 4, GenuineIntel",
+    "max_sequence_length": 384,
+    "document_stride": 128,
+    "benchmark_sha256": "A0C5E7C0645D0D5CAEF2636CA036D301AF65DA1C54900B49F002C7914F341C90"
+  }
+}
