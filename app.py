@@ -968,7 +968,9 @@ if last_run is not None and last_run["signature"] == signature:
             )
         source = escape(response.source or "")
         chunk_id = escape(response.chunk_id or "")
-        page_label = f"Page {response.page}" if response.page is not None else "Page N/A"
+        source_kind = Path(response.source or "").suffix.lower()
+        location_label = "Slide" if source_kind == ".pptx" else "Page"
+        page_label = f"{location_label} {response.page}" if response.page is not None else f"{location_label} N/A"
         st.markdown("### Source")
         st.markdown(
             f'<div class="result-meta" style="font-size: 12px; margin-bottom: 16px;">'
@@ -1029,7 +1031,8 @@ if last_run is not None and last_run["signature"] == signature:
             source = escape(result.source)
             chunk_id = escape(result.chunk_id)
             passage = escape(result.chunk.text)
-            page_label = f"PAGE {result.page}" if result.page is not None else "PAGE N/A"
+            location_label = "SLIDE" if Path(result.source).suffix.lower() == ".pptx" else "PAGE"
+            page_label = f"{location_label} {result.page}" if result.page is not None else f"{location_label} N/A"
             st.markdown(
                 f'<div class="result"><div class="result-meta">{rank:02d} &nbsp; {source} &nbsp; / &nbsp; {page_label} &nbsp; / &nbsp; {chunk_id}<span class="score">{result.score:.4f}</span></div><div class="result-text">{passage}</div></div>',
                 unsafe_allow_html=True,
@@ -1052,7 +1055,7 @@ with st.expander("Architecture Pipeline", expanded=False):
         """
 **Inference Sequence:**
 
-1. **Document Ingestion**: Parsing PDF, DOCX, TXT, and Markdown files.
+1. **Document Ingestion**: Parsing PDF, PPTX, DOCX, TXT, and Markdown files.
 2. **Text Chunking**: Sliding word-window chunking with configurable overlap.
 3. **Information Retrieval**: Term-frequency / inverse-document-frequency (TF-IDF) or Okapi BM25 scoring.
 4. **Passage Ranking**: Top-K most relevant passage chunks selected.
@@ -1366,6 +1369,7 @@ with st.expander("Evaluation", expanded=False):
                         st.write(detail_dict)
                         for passage in row.retrieved:
                             page = passage["page"] if passage["page"] is not None else "N/A"
-                            st.markdown(f"**Rank {passage['rank']} · {passage['source']} · Page {page} · {passage['chunk_id']} · score {passage['score']:.4f}**")
+                            location_label = "Slide" if Path(passage["source"]).suffix.lower() == ".pptx" else "Page"
+                            st.markdown(f"**Rank {passage['rank']} · {passage['source']} · {location_label} {page} · {passage['chunk_id']} · score {passage['score']:.4f}**")
                             st.write(passage["text"])
 
