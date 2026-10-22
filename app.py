@@ -38,7 +38,7 @@ STANDARD_CORPUS_DIR = BASE_DIR / "data" / "documents"
 MULTI_FORMAT_CORPUS_DIR = SAMPLE_CORPUS_DIR
 ASSETS_CORPUS_DIR = BASE_DIR / "assests"
 STANDARD_QUESTIONS_PATH = BASE_DIR / "data" / "evaluation" / "questions.json"
-SUPPORTED_TYPES = ["pdf", "txt", "docx", "md", "markdown"]
+SUPPORTED_TYPES = ["pdf", "pptx", "txt", "docx", "md", "markdown"]
 
 
 def _answer_context(response: object) -> str | None:
@@ -651,7 +651,7 @@ with st.expander("System Instructions & Workflow", expanded=False):
 with st.sidebar:
     st.markdown("### Document Corpus")
     st.caption("Add documents to your knowledge base")
-    st.markdown("PDF · TXT · DOCX · Markdown", help="Maximum 100 MB per file")
+    st.markdown("PDF · PPTX · TXT · DOCX · Markdown", help="Maximum 100 MB per file")
     uploads = st.file_uploader(
         "Drop files here or click to browse",
         type=SUPPORTED_TYPES,
