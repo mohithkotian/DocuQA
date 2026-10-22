@@ -1,0 +1,44 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+*.egg
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# Testing and coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Logs and runtime caches
+*.log
+.work/
+.streamlit-smoke.log
+.docuqa_cache/
+models/
+results/
+results-*/
+evaluation/
+*.zip
+
+# Temporary agent / sandbox outputs
+.manus/
+box/
+omnirush-server/
+outputs/
+
+# OS and IDE files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "docuqa"
+version = "0.2.0"
+description = "Local extractive question answering over cricket documents"
+requires-python = ">=3.11"
+dependencies = [
+  "pypdf>=5,<7",
+  "python-docx>=1.1,<2",
+  "scikit-learn>=1.5,<2",
+  "streamlit>=1.52,<2",
+  "torch>=2.2,<3",
+  "transformers>=4.45,<5",
+]
+
+[project.optional-dependencies]
+test = [
+  "pytest>=8.0,<9",
+]
+
+[project.scripts]
+docuqa = "docuqa.benchmark:main"
+docuqa-research = "docuqa.research:main"
+
+[tool.setuptools.packages.find]
+include = ["docuqa*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-ra"
+
+[tool.pyrefly]
+python-interpreter-path = "C:/Python314/python.exe"
+site-package-path = ["C:/Python314/Lib/site-packages"]
