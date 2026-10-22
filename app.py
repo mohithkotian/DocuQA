@@ -968,13 +968,17 @@ if corpus_index is not None and corpus_index.uploaded:
             else:
                 candidates = []
                 seen_questions = set()
+                candidate_origins = {}
                 generation_progress = st.progress(0, text="Generating candidate questions from active documents...")
                 candidate_cap = max(12, requested_qa_count * 4)
                 for context_index, chunk in enumerate(context_chunks, start=1):
                     generated = question_generator.generate_questions(chunk.text, limit=5)
                     for question in generated:
                         normalized = re.sub(r"[^a-z0-9]+", " ", question.casefold()).strip()
-                        if normalized and normalized not in seen_questions:
+                        if not normalized:
+                            continue
+                        candidate_origins.setdefault(normalized, set()).add(chunk.source)
+                        if normalized not in seen_questions:
                             seen_questions.add(normalized)
                             candidates.append(question)
                     generation_progress.progress(
@@ -1000,7 +1004,12 @@ if corpus_index is not None and corpus_index.uploaded:
                         _, response = ask_indexed_corpus(
                             corpus_index, question, "BM25", DEFAULT_TOP_K, qa_model
                         )
-                        if _response_is_grounded(response, active_sources):
+                        normalized = re.sub(r"[^a-z0-9]+", " ", question.casefold()).strip()
+                        origins = candidate_origins.get(normalized, set())
+                        if (
+                            _response_is_grounded(response, active_sources)
+                            and response.source in origins
+                        ):
                             verified_pairs.append({"question": question, "response": response})
                         else:
                             rejected_count += 1
