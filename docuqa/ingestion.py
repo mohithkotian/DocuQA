@@ -103,7 +103,7 @@ def _extract(path: Path) -> tuple[list[tuple[str, int | None]], int | None]:
                         cells = [cell.text.strip() for cell in row.cells]
                         if any(cells):
                             lines.append(" | ".join(cells))
-            slide_text.append(("\\n".join(lines), slide_number))
+            slide_text.append(("\n".join(lines), slide_number))
         return slide_text, len(presentation.slides)
     text = path.read_text(encoding="utf-8-sig")
     # Markdown syntax is retained as useful textual content; only structural syntax is removed.
