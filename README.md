@@ -50,6 +50,12 @@ graph TD
 
 ---
 
+## Document-grounded question generation
+
+For uploaded documents, the app offers an on-demand **Generate document Q&A** action. A local question-generation model (valhalla/t5-small-e2e-qg) proposes candidate questions from representative chunks in the active corpus. DocuQA then sends each candidate through the existing BM25 retriever and fine-tuned extractive MiniLM QA model.
+
+Only Q&A pairs whose answer is marked supported and whose answer span matches the cited evidence exactly are displayed. Candidates that cannot be answered from the active corpus are discarded, not guessed. The question-generation checkpoint is downloaded from Hugging Face on first use; generation and answer inference run locally and do not call a hosted inference API. See the question-generation [model card](https://huggingface.co/valhalla/t5-small-e2e-qg).
+
 ## User Interaction Flow
 
 ```mermaid
