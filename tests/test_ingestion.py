@@ -79,7 +79,8 @@ def test_ingests_all_supported_formats_and_reports_metadata(all_formats: list[Pa
 
 
 def test_pdf_chunks_retain_one_based_source_page_numbers(all_formats: list[Path]) -> None:
-    pdf_doc = ingest_document(all_formats[-1], chunk_size=100, overlap=10)
+    pdf_path = next(path for path in all_formats if path.suffix == ".pdf")
+    pdf_doc = ingest_document(pdf_path, chunk_size=100, overlap=10)
     assert {chunk.page for chunk in pdf_doc.chunks} == {1, 2}
     assert "page one" in pdf_doc.chunks[0].text
     assert "page two" in pdf_doc.chunks[1].text
