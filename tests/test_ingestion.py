@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 from docx import Document as DocxDocument
 from pypdf import PdfReader, PdfWriter
+from pptx import Presentation
 
 from docuqa import clean_text, ingest_document, ingest_documents
 
@@ -48,13 +49,22 @@ def all_formats(tmp_path: Path) -> list[Path]:
     doc.save(docx_path)
     pdf_path = tmp_path / "cricket_pages.pdf"
     make_pdf(pdf_path)
-    return paths + [docx_path, pdf_path]
+    pptx_path = tmp_path / "cricket_slides.pptx"
+    presentation = Presentation()
+    slide_one = presentation.slides.add_slide(presentation.slide_layouts[1])
+    slide_one.shapes.title.text = "Cricket Introduction"
+    slide_one.placeholders[1].text = "A cricket team fields eleven players."
+    slide_two = presentation.slides.add_slide(presentation.slide_layouts[1])
+    slide_two.shapes.title.text = "Overs"
+    slide_two.placeholders[1].text = "An over contains six legal deliveries."
+    presentation.save(pptx_path)
+    return paths + [docx_path, pdf_path, pptx_path]
 
 
 def test_ingests_all_supported_formats_and_reports_metadata(all_formats: list[Path]) -> None:
     documents = ingest_documents(all_formats, chunk_size=20, overlap=3)
-    assert len(documents) == 4
-    assert [doc.file_type for doc in documents] == ["md", "txt", "docx", "pdf"]
+    assert len(documents) == 5
+    assert [doc.file_type for doc in documents] == ["md", "txt", "docx", "pdf", "pptx"]
     for doc in documents:
         assert doc.filename
         assert doc.source
@@ -64,11 +74,13 @@ def test_ingests_all_supported_formats_and_reports_metadata(all_formats: list[Pa
         assert doc.chunks
         assert all(chunk.document_id == doc.document_id for chunk in doc.chunks)
         assert all(chunk.source == doc.filename for chunk in doc.chunks)
-    assert documents[-1].page_count == 2
+    assert documents[3].page_count == 2
+    assert documents[4].page_count == 2
 
 
 def test_pdf_chunks_retain_one_based_source_page_numbers(all_formats: list[Path]) -> None:
-    pdf_doc = ingest_document(all_formats[-1], chunk_size=100, overlap=10)
+    pdf_path = next(path for path in all_formats if path.suffix == ".pdf")
+    pdf_doc = ingest_document(pdf_path, chunk_size=100, overlap=10)
     assert {chunk.page for chunk in pdf_doc.chunks} == {1, 2}
     assert "page one" in pdf_doc.chunks[0].text
     assert "page two" in pdf_doc.chunks[1].text
@@ -104,3 +116,39 @@ def test_rejects_invalid_chunk_settings_and_extensions(tmp_path: Path) -> None:
     unsupported.write_text("<p>Text</p>", encoding="utf-8")
     with pytest.raises(ValueError, match="Unsupported"):
         ingest_document(unsupported)
+
+
+def test_pptx_chunks_retain_one_based_slide_numbers(tmp_path: Path) -> None:
+    path = tmp_path / "cricket_slides.pptx"
+    presentation = Presentation()
+    first = presentation.slides.add_slide(presentation.slide_layouts[1])
+    first.shapes.title.text = "Cricket Introduction"
+    first.placeholders[1].text = "A cricket team fields eleven players."
+    second = presentation.slides.add_slide(presentation.slide_layouts[1])
+    second.shapes.title.text = "Overs"
+    second.placeholders[1].text = "An over contains six legal deliveries."
+    presentation.save(path)
+
+    document = ingest_document(path, chunk_size=100, overlap=10)
+
+    assert document.file_type == "pptx"
+    assert document.page_count == 2
+    assert [chunk.page for chunk in document.chunks] == [1, 2]
+    assert "eleven players" in document.chunks[0].text
+    assert "six legal deliveries" in document.chunks[1].text
+
+
+def test_pptx_table_text_is_extracted(tmp_path: Path) -> None:
+    path = tmp_path / "cricket_table.pptx"
+    presentation = Presentation()
+    slide = presentation.slides.add_slide(presentation.slide_layouts[1])
+    table = slide.shapes.add_table(2, 2, 0, 0, 5000000, 1500000).table
+    table.cell(0, 0).text = "Format"
+    table.cell(0, 1).text = "Overs"
+    table.cell(1, 0).text = "ODI"
+    table.cell(1, 1).text = "50"
+    presentation.save(path)
+    document = ingest_document(path)
+    joined = " ".join(chunk.text for chunk in document.chunks)
+    assert "Format | Overs" in joined
+    assert "ODI | 50" in joined
