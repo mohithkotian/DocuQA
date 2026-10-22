@@ -7,7 +7,7 @@ import re
 import time
 from typing import Iterable
 
-SUPPORTED_EXTENSIONS = {".pdf", ".txt", ".docx", ".md", ".markdown"}
+SUPPORTED_EXTENSIONS = {".pdf", ".pptx", ".txt", ".docx", ".md", ".markdown"}
 
 
 @dataclass(frozen=True)
@@ -68,7 +68,7 @@ def clean_text(text: str) -> str:
 def _extract(path: Path) -> tuple[list[tuple[str, int | None]], int | None]:
     suffix = path.suffix.lower()
     if suffix not in SUPPORTED_EXTENSIONS:
-        raise ValueError(f"Unsupported file type {suffix!r}; supported: PDF, TXT, DOCX, Markdown")
+        raise ValueError(f"Unsupported file type {suffix!r}; supported: PDF, PPTX, TXT, DOCX, Markdown")
     if suffix == ".pdf":
         try:
             from pypdf import PdfReader
@@ -83,6 +83,28 @@ def _extract(path: Path) -> tuple[list[tuple[str, int | None]], int | None]:
             raise RuntimeError("DOCX support requires python-docx") from exc
         source = DocxDocument(str(path))
         return [(paragraph.text, None) for paragraph in source.paragraphs], None
+    if suffix == ".pptx":
+        try:
+            from pptx import Presentation
+        except ImportError as exc:
+            raise RuntimeError("PPTX support requires python-pptx") from exc
+        presentation = Presentation(str(path))
+        # Reuse Chunk.page for a 1-based slide number to preserve source location.
+        slide_text: list[tuple[str, int | None]] = []
+        for slide_number, slide in enumerate(presentation.slides, start=1):
+            lines: list[str] = []
+            for shape in slide.shapes:
+                if getattr(shape, "has_text_frame", False):
+                    shape_text = shape.text.strip()
+                    if shape_text:
+                        lines.append(shape_text)
+                if getattr(shape, "has_table", False):
+                    for row in shape.table.rows:
+                        cells = [cell.text.strip() for cell in row.cells]
+                        if any(cells):
+                            lines.append(" | ".join(cells))
+            slide_text.append(("\\n".join(lines), slide_number))
+        return slide_text, len(presentation.slides)
     text = path.read_text(encoding="utf-8-sig")
     # Markdown syntax is retained as useful textual content; only structural syntax is removed.
     if suffix in {".md", ".markdown"}:
@@ -166,7 +188,7 @@ def ingest_document_timed(file_path: str | Path, chunk_size: int = 180,
     """Extract, clean, split and chunk a supported document.
 
     ``chunk_size`` and ``overlap`` are measured in whitespace-delimited words.
-    PDF page numbers are one-based; formats without reliable pagination use ``None``.
+    PDF page numbers and PPTX slide numbers are one-based; formats without reliable pagination use ``None``.
     """
     path = Path(file_path)
     if chunk_size < 1:
