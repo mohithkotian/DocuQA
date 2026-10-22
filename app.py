@@ -23,6 +23,7 @@ from docuqa import (
 from docuqa.evaluation import aggregate_public, evaluate_public_case, load_public_questions
 from docuqa.final_report import build_final_report_payload, write_final_report
 from docuqa.cache import build_cached_corpus_index, cache_status, corpus_signature
+from docuqa.question_generation import LocalQuestionGenerator
 from docuqa.config import (
     CORPUS_DIR,
     DEFAULT_CHUNK_SIZE,
@@ -60,6 +61,12 @@ def _answer_context(response: object) -> str | None:
 def load_qa_model() -> LocalExtractiveQAModel:
     """Load and cache the public Hugging Face model locally on the first question."""
     return LocalExtractiveQAModel()
+
+
+@st.cache_resource(show_spinner=False)
+def load_question_generator() -> LocalQuestionGenerator:
+    """Load the local question generator only when the user requests batch Q&A."""
+    return LocalQuestionGenerator()
 
 
 @st.cache_resource(show_spinner=False)
@@ -107,6 +114,9 @@ def _clear_corpus() -> None:
     st.session_state.last_answer_run = None
     st.session_state.answer_cache = {}
     st.session_state.evaluation_rows = []
+    st.session_state.document_qa_pairs = []
+    st.session_state.document_qa_signature = None
+    st.session_state.document_qa_error = None
 
 
 st.set_page_config(
@@ -544,6 +554,61 @@ def _assets_pdf_corpus(index) -> bool:
     )
 
 
+def _sample_chunks_for_question_generation(index, max_contexts: int) -> list[object]:
+    """Select representative active-corpus chunks while spreading across documents."""
+    groups = [
+        [chunk for chunk in document.chunks if len(chunk.text.split()) >= 10]
+        for document in index.documents
+    ]
+    groups = [group for group in groups if group]
+    if not groups:
+        return []
+
+    allocations = [1] * len(groups)
+    while sum(allocations) < max_contexts:
+        candidates = [i for i, group in enumerate(groups) if allocations[i] < len(group)]
+        if not candidates:
+            break
+        # Allocate proportionally so one long PDF does not automatically consume the budget.
+        chosen = max(candidates, key=lambda i: len(groups[i]) / allocations[i])
+        allocations[chosen] += 1
+
+    per_document: list[list[object]] = []
+    for group, count in zip(groups, allocations):
+        if count == 1:
+            positions = [len(group) // 2]
+        else:
+            positions = [round(i * (len(group) - 1) / (count - 1)) for i in range(count)]
+        per_document.append([group[position] for position in positions])
+
+    selected: list[object] = []
+    for round_index in range(max(len(group) for group in per_document)):
+        for group in per_document:
+            if round_index < len(group):
+                selected.append(group[round_index])
+                if len(selected) >= max_contexts:
+                    return selected
+    return selected
+
+
+def _response_is_grounded(response: object, active_sources: set[str]) -> bool:
+    """Accept only supported answers that are exact spans in active-corpus evidence."""
+    answer = getattr(response, "answer", "") or ""
+    evidence = getattr(response, "evidence_text", "") or ""
+    start = getattr(response, "answer_start", None)
+    end = getattr(response, "answer_end", None)
+    return bool(
+        getattr(response, "supported", False)
+        and getattr(response, "source", None) in active_sources
+        and answer.strip()
+        and evidence
+        and isinstance(start, int)
+        and isinstance(end, int)
+        and 0 <= start < end <= len(evidence)
+        and evidence[start:end] == answer
+    )
+
+
 def _related_questions(index, limit: int = 6) -> list[str]:
     """Rank local prompts against the active corpus only.
 
@@ -612,6 +677,11 @@ for key, value in {
     "fair_top_k_results": None,
     "fair_chunk_results": None,
     "final_report": None,
+    "document_qa_pairs": [],
+    "document_qa_signature": None,
+    "document_qa_error": None,
+    "document_qa_rejected": 0,
+    "document_qa_candidates": 0,
 }.items():
     if key not in st.session_state:
         st.session_state[key] = value
@@ -851,6 +921,128 @@ else:
                     )
         else:
             st.info("No built-in cricket questions matched this upload yet. Enter a question below about the document's terminology, rules, or definitions.")
+
+if corpus_index is not None and corpus_index.uploaded:
+    st.markdown("---")
+    st.markdown("### Generate Q&A from the uploaded document")
+    st.caption(
+        "A local question-generation model proposes questions from your active documents. "
+        "DocuQA then answers them with BM25 + your fine-tuned MiniLM checkpoint. "
+        "Only answers whose exact text span is verified in the active source evidence are shown."
+    )
+    qg_col, qg_action_col = st.columns([1, 2])
+    with qg_col:
+        requested_qa_count = st.selectbox(
+            "Verified Q&A pairs",
+            options=[3, 5, 8, 10],
+            index=1,
+            key="document_qa_count",
+        )
+    with qg_action_col:
+        st.write("")
+        st.write("")
+        generate_document_qa = st.button(
+            "Generate document Q&A",
+            key="generate_document_qa",
+            disabled=corpus_selection_pending,
+            use_container_width=True,
+        )
+
+    if generate_document_qa:
+        st.session_state.document_qa_pairs = []
+        st.session_state.document_qa_signature = st.session_state.get("active_corpus_signature")
+        st.session_state.document_qa_error = None
+        st.session_state.document_qa_rejected = 0
+        st.session_state.document_qa_candidates = 0
+        try:
+            with st.spinner("Loading local question-generation and QA models..."):
+                question_generator = load_question_generator()
+                qa_model = load_qa_model()
+
+            max_contexts = min(12, max(4, requested_qa_count * 2))
+            context_chunks = _sample_chunks_for_question_generation(corpus_index, max_contexts)
+            if not context_chunks:
+                st.session_state.document_qa_error = (
+                    "No sufficiently long text chunks were found in the active documents."
+                )
+            else:
+                candidates = []
+                seen_questions = set()
+                generation_progress = st.progress(0, text="Generating candidate questions from active documents...")
+                candidate_cap = max(12, requested_qa_count * 4)
+                for context_index, chunk in enumerate(context_chunks, start=1):
+                    generated = question_generator.generate_questions(chunk.text, limit=5)
+                    for question in generated:
+                        normalized = re.sub(r"[^a-z0-9]+", " ", question.casefold()).strip()
+                        if normalized and normalized not in seen_questions:
+                            seen_questions.add(normalized)
+                            candidates.append(question)
+                    generation_progress.progress(
+                        context_index / len(context_chunks),
+                        text=f"Reading document passages for questions ({context_index}/{len(context_chunks)})...",
+                    )
+                    if len(candidates) >= candidate_cap:
+                        break
+                generation_progress.empty()
+                st.session_state.document_qa_candidates = len(candidates)
+
+                if not candidates:
+                    st.session_state.document_qa_error = (
+                        "The question-generation model did not produce usable questions from this file. "
+                        "Try another text-based PDF or ask a direct question."
+                    )
+                else:
+                    verified_pairs = []
+                    rejected_count = 0
+                    active_sources = {document.filename for document in corpus_index.documents}
+                    answer_progress = st.progress(0, text="Checking generated questions against the active documents...")
+                    for candidate_index, question in enumerate(candidates, start=1):
+                        _, response = ask_indexed_corpus(
+                            corpus_index, question, "BM25", DEFAULT_TOP_K, qa_model
+                        )
+                        if _response_is_grounded(response, active_sources):
+                            verified_pairs.append({"question": question, "response": response})
+                        else:
+                            rejected_count += 1
+                        answer_progress.progress(
+                            candidate_index / len(candidates),
+                            text=f"Evidence-checking question {candidate_index}/{len(candidates)}...",
+                        )
+                        if len(verified_pairs) >= requested_qa_count:
+                            break
+                    answer_progress.empty()
+                    st.session_state.document_qa_pairs = verified_pairs
+                    st.session_state.document_qa_rejected = rejected_count
+        except Exception as exc:
+            st.session_state.document_qa_error = f"{type(exc).__name__}: {exc}"
+
+    current_signature = st.session_state.get("active_corpus_signature")
+    if st.session_state.get("document_qa_signature") == current_signature:
+        if st.session_state.get("document_qa_error"):
+            st.error(st.session_state.document_qa_error)
+        elif st.session_state.get("document_qa_pairs"):
+            pairs = st.session_state.document_qa_pairs
+            st.success(f"Generated {len(pairs)} evidence-verified Q&A pair(s).")
+            rejected = st.session_state.get("document_qa_rejected", 0)
+            if rejected:
+                st.caption(f"Discarded {rejected} candidate(s) that did not pass evidence validation.")
+            for pair_number, item in enumerate(pairs, start=1):
+                response = item["response"]
+                with st.expander(f"{pair_number}. {item['question']}", expanded=(pair_number == 1)):
+                    st.markdown("**Answer**")
+                    st.write(response.answer)
+                    source = response.source or "Unknown source"
+                    extension = Path(source).suffix.lower()
+                    location_label = "Slide" if extension == ".pptx" else "Page"
+                    location = f"{location_label} {response.page}" if response.page is not None else f"{location_label} N/A"
+                    st.caption(f"Source: {source} · {location} · Chunk: {response.chunk_id or 'N/A'}")
+                    st.markdown("**Evidence from the uploaded document**")
+                    st.text(response.evidence_text or "")
+        elif st.session_state.get("document_qa_candidates", 0):
+            st.info(
+                "Candidate questions were generated, but none produced an answer that passed "
+                "the source-span evidence check. No unsupported answers were displayed."
+            )
 
 with st.expander("Retrieval Parameters", expanded=False):
     adv_col1, adv_col2 = st.columns(2)
