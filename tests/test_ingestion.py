@@ -51,10 +51,10 @@ def all_formats(tmp_path: Path) -> list[Path]:
     make_pdf(pdf_path)
     pptx_path = tmp_path / "cricket_slides.pptx"
     presentation = Presentation()
-    slide_one = presentation.slides.add_slide(presentation.slide_layouts[5])
+    slide_one = presentation.slides.add_slide(presentation.slide_layouts[1])
     slide_one.shapes.title.text = "Cricket Introduction"
     slide_one.placeholders[1].text = "A cricket team fields eleven players."
-    slide_two = presentation.slides.add_slide(presentation.slide_layouts[5])
+    slide_two = presentation.slides.add_slide(presentation.slide_layouts[1])
     slide_two.shapes.title.text = "Overs"
     slide_two.placeholders[1].text = "An over contains six legal deliveries."
     presentation.save(pptx_path)
@@ -120,10 +120,10 @@ def test_rejects_invalid_chunk_settings_and_extensions(tmp_path: Path) -> None:
 def test_pptx_chunks_retain_one_based_slide_numbers(tmp_path: Path) -> None:
     path = tmp_path / "cricket_slides.pptx"
     presentation = Presentation()
-    first = presentation.slides.add_slide(presentation.slide_layouts[5])
+    first = presentation.slides.add_slide(presentation.slide_layouts[1])
     first.shapes.title.text = "Cricket Introduction"
     first.placeholders[1].text = "A cricket team fields eleven players."
-    second = presentation.slides.add_slide(presentation.slide_layouts[5])
+    second = presentation.slides.add_slide(presentation.slide_layouts[1])
     second.shapes.title.text = "Overs"
     second.placeholders[1].text = "An over contains six legal deliveries."
     presentation.save(path)
@@ -140,7 +140,7 @@ def test_pptx_chunks_retain_one_based_slide_numbers(tmp_path: Path) -> None:
 def test_pptx_table_text_is_extracted(tmp_path: Path) -> None:
     path = tmp_path / "cricket_table.pptx"
     presentation = Presentation()
-    slide = presentation.slides.add_slide(presentation.slide_layouts[5])
+    slide = presentation.slides.add_slide(presentation.slide_layouts[1])
     table = slide.shapes.add_table(2, 2, 0, 0, 5000000, 1500000).table
     table.cell(0, 0).text = "Format"
     table.cell(0, 1).text = "Overs"
