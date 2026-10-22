@@ -7,11 +7,11 @@
 
 ## Overview
 
-DocuQA is a domain-specific document question-answering system. Given a collection of cricket documents (in PDF, DOCX, TXT, or Markdown format), DocuQA indexes the text into overlapping word windows, retrieves candidate passages via classical IR algorithms (**TF-IDF with Cosine Similarity** or **Okapi BM25**), and uses a **local extractive Transformer** to pinpoint the exact answer span within the retrieved evidence.
+DocuQA is a domain-specific document question-answering system. Given a collection of cricket documents (in PDF, PPTX, DOCX, TXT, or Markdown format), DocuQA indexes the text into overlapping word windows, retrieves candidate passages via classical IR algorithms (**TF-IDF with Cosine Similarity** or **Okapi BM25**), and uses a **local extractive Transformer** to pinpoint the exact answer span within the retrieved evidence.
 
 ### Core Principles
 - **Evidence-constrained extractive answers:** Answers are selected as verbatim character spans from retrieved passages and checked against cited evidence; unsupported cases are designed to trigger abstention.
-- **Auditable Evidence & Attribution:** Every answer cites its exact source document, page number, chunk ID, and character offsets.
+- **Auditable Evidence & Attribution:** Every answer cites its exact source document, PDF page or PowerPoint slide number (when available), chunk ID, and character offsets.
 - **Safe Abstention:** If a question cannot be answered from the provided documents or if model confidence falls below threshold, DocuQA abstains with an explicit notice instead of guessing or fabricating facts.
 - **Zero External APIs:** Runs completely offline on local CPU/GPU using PyTorch and Hugging Face Transformers. No OpenAI, Anthropic, or external cloud calls.
 - **No Heavy Vector Databases:** Pure Information Retrieval (TF-IDF and BM25) without LangChain, Chroma, FAISS, or complex agent overhead.
@@ -22,9 +22,9 @@ DocuQA is a domain-specific document question-answering system. Given a collecti
 
 ```mermaid
 graph TD
-    A["Cricket Documents<br><i>.pdf, .docx, .txt, .md</i>"] --> B["Text Extraction & Preprocessing<br><i>Unicode normalization, paragraph splitting</i>"]
+    A["Cricket Documents<br><i>.pdf, .pptx, .docx, .txt, .md</i>"] --> B["Text Extraction & Preprocessing<br><i>Unicode normalization, paragraph splitting</i>"]
     B --> C["Sliding-Window Chunking<br><i>Configurable chunk size & overlap</i>"]
-    C --> D["Metadata Tagging<br><i>Source filename, page number, chunk ID</i>"]
+    C --> D["Metadata Tagging<br><i>Source filename, page/slide number, chunk ID</i>"]
     
     D --> E1["TF-IDF Vector Space Model<br><i>TfidfVectorizer + Cosine Similarity</i>"]
     D --> E2["Okapi BM25 Index<br><i>Robertson IDF + Length Normalization</i>"]
@@ -261,6 +261,7 @@ DocuQA/
 
 1. **Ingestion & Extraction:**
    - PDF extraction via `pypdf`, preserving 1-based page numbers.
+   - PowerPoint extraction via `python-pptx`, preserving 1-based slide numbers and table cell text.
    - DOCX extraction via `python-docx`.
    - Markdown and TXT normalization (BOM removal, whitespace normalization, layout cleaning).
 2. **Chunking:**
