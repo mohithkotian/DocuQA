@@ -977,7 +977,7 @@ if corpus_index is not None and corpus_index.uploaded:
                         normalized = re.sub(r"[^a-z0-9]+", " ", question.casefold()).strip()
                         if not normalized:
                             continue
-                        candidate_origins.setdefault(normalized, set()).add(chunk.source)
+                        candidate_origins.setdefault(normalized, set()).add((chunk.source, chunk.chunk_id))
                         if normalized not in seen_questions:
                             seen_questions.add(normalized)
                             candidates.append(question)
@@ -1006,9 +1006,10 @@ if corpus_index is not None and corpus_index.uploaded:
                         )
                         normalized = re.sub(r"[^a-z0-9]+", " ", question.casefold()).strip()
                         origins = candidate_origins.get(normalized, set())
+                        answer_origin = (response.source, response.chunk_id)
                         if (
                             _response_is_grounded(response, active_sources)
-                            and response.source in origins
+                            and answer_origin in origins
                         ):
                             verified_pairs.append({"question": question, "response": response})
                         else:
