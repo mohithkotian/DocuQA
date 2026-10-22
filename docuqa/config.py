@@ -24,7 +24,7 @@ MAX_UPLOAD_BYTES = min(
     MAX_UPLOAD_BYTES_LIMIT,
 )
 DEFAULT_QA_MODEL = os.getenv("DOCUQA_QA_MODEL", "models/docuqa-minilm-cricket/")
-ALLOWED_EXTENSIONS = frozenset({".pdf", ".txt", ".docx", ".md", ".markdown"})
+ALLOWED_EXTENSIONS = frozenset({".pdf", ".pptx", ".txt", ".docx", ".md", ".markdown"})
 
 
 def validate_upload_sizes(files: Iterable[tuple[str, int]]) -> None:
