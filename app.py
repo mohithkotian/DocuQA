@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from html import escape
 import json
 from pathlib import Path
@@ -11,10 +12,18 @@ import streamlit as st
 
 from docuqa import (
     ChunkExperimentResult,
+    DEFAULT_CLASSIFIER_PATH,
     DEFAULT_QA_MODEL,
+    DetectedQuestion,
+    DomainClassificationResult,
+    DomainClassifier,
     LocalExtractiveQAModel,
+    OUT_OF_DOMAIN_REJECTION_MESSAGE,
+    UNSUPPORTED_DOCUMENT_MESSAGE,
     ask_indexed_corpus,
     build_corpus_index,
+    classify_question_type,
+    detect_document_questions,
     run_chunk_configuration_experiment,
     run_fair_chunk_size_experiment,
     run_fair_top_k_experiment,
@@ -63,6 +72,12 @@ def load_qa_model() -> LocalExtractiveQAModel:
 
 
 @st.cache_resource(show_spinner=False)
+def load_domain_classifier_model() -> DomainClassifier:
+    """Load and cache the supervised Cricket vs Other domain classifier."""
+    return DomainClassifier.load(DEFAULT_CLASSIFIER_PATH)
+
+
+@st.cache_resource(show_spinner=False)
 def load_benchmark_index() -> object:
     """Build the fixed benchmark corpus once, independently of the active upload."""
     return build_corpus_index(
@@ -107,6 +122,8 @@ def _clear_corpus() -> None:
     st.session_state.last_answer_run = None
     st.session_state.answer_cache = {}
     st.session_state.evaluation_rows = []
+    st.session_state.detected_questions = []
+    st.session_state.invalid_document_warnings = []
 
 
 st.set_page_config(
@@ -491,11 +508,483 @@ st.markdown(
     [data-testid="stMetricValue"] { font-family:'Instrument Serif',Georgia,serif !important; color:var(--ink) !important; }
     [data-testid="stVerticalBlockBorderWrapper"] { border-radius:0 !important; box-shadow:none !important; }
     footer { visibility:hidden; }
+    /* Sidebar repair overrides: target Streamlit data-testid hooks, not unstable class names. */
+    [data-testid="stSidebar"] { background:#262734 !important; overflow-x:hidden !important; }
+    [data-testid="stSidebar"] > div:first-child { padding-top:1.25rem !important; padding-bottom:1.25rem !important; }
+    [data-testid="stSidebar"] [data-testid="stVerticalBlock"] { gap:0.75rem !important; }
+    [data-testid="stSidebar"] [data-testid="stButton"] { width:100% !important; margin:0 !important; }
+    [data-testid="stSidebar"] [data-testid="stButton"] button,
+    [data-testid="stSidebar"] [data-testid="stButton"] button p,
+    [data-testid="stSidebar"] [data-testid="stButton"] button span {
+      margin:0 !important; min-height:44px !important; height:44px !important; width:100% !important;
+      padding:0 16px !important; display:flex !important; align-items:center !important; justify-content:center !important;
+      white-space:nowrap !important; overflow:hidden !important; text-overflow:ellipsis !important;
+    }
+    [data-testid="stSidebar"] [data-testid="stButton"] button {
+      border-radius:4px !important; background:transparent !important; border:1px solid rgba(232,226,216,.42) !important;
+      color:#e8e2d8 !important; font-family:'Azeret Mono',monospace !important; text-transform:uppercase !important;
+      letter-spacing:.08em !important; line-height:1 !important;
+    }
+    [data-testid="stSidebar"] [data-testid="stButton"] button:hover { border-color:#e8e2d8 !important; background:#30313f !important; color:#fff !important; }
+    [data-testid="stSidebar"] [data-testid="stButton"] button[kind="primary"],
+    [data-testid="stSidebar"] [data-testid="stBaseButton-primary"] {
+      background:#9c3118 !important; border-color:#9c3118 !important; color:#e6e1d8 !important;
+    }
+    [data-testid="stSidebar"] [data-testid="stFileUploader"] { margin:0 !important; }
+    [data-testid="stSidebar"] [data-testid="stFileUploader"] section {
+      padding:12px !important; min-height:0 !important; overflow:hidden !important; background:#1c1c27 !important;
+      border:1px dashed rgba(232,226,216,.38) !important; border-radius:6px !important;
+    }
+    [data-testid="stSidebar"] [data-testid="stFileUploader"] section > div { padding:0 !important; }
+    [data-testid="stSidebar"] [data-testid="stFileUploader"] section small,
+    [data-testid="stSidebar"] [data-testid="stFileUploader"] section [data-testid="stCaptionContainer"] {
+      color:#9a9aa8 !important; font-size:12px !important; line-height:1.35 !important; white-space:normal !important;
+    }
+    [data-testid="stSidebar"] [data-testid="stFileUploader"] button {
+      min-height:36px !important; height:36px !important; width:auto !important; padding:0 12px !important;
+      justify-content:flex-start !important; background:#30313f !important; color:#e8e2d8 !important;
+    }
+    [data-testid="stSidebar"] [data-testid="stFileUploaderFile"] {
+      display:flex !important; align-items:center !important; gap:12px !important; min-height:52px !important;
+      margin:0 0 8px !important; padding:10px 12px !important; border-radius:8px !important;
+      background:#ddd7c8 !important; border:1px solid rgba(28,28,39,.14) !important; color:#1c1c27 !important;
+    }
+    [data-testid="stSidebar"] [data-testid="stFileUploaderFile"] > div:first-child,
+    [data-testid="stSidebar"] [data-testid="stFileUploaderFile"] svg {
+      width:32px !important; height:32px !important; min-width:32px !important; max-width:32px !important;
+      color:#5b5b68 !important; fill:#5b5b68 !important; stroke:#5b5b68 !important; align-self:center !important;
+    }
+    [data-testid="stSidebar"] [data-testid="stFileUploaderFileName"] {
+      display:block !important; min-width:0 !important; flex:1 1 auto !important; color:#1c1c27 !important;
+      font-size:14px !important; font-weight:500 !important; line-height:1.25 !important; white-space:nowrap !important;
+      overflow:hidden !important; text-overflow:ellipsis !important;
+    }
+    [data-testid="stSidebar"] [data-testid="stFileUploaderFileName"]::after { color:#5b5b68 !important; font-size:12px !important; }
+    [data-testid="stSidebar"] [data-testid="stFileUploaderFile"] button {
+      width:28px !important; min-width:28px !important; height:28px !important; min-height:28px !important;
+      padding:0 !important; margin-left:auto !important; background:transparent !important; border:0 !important;
+      color:#1c1c27 !important; display:flex !important; align-items:center !important; justify-content:center !important;
+    }
+    [data-testid="stSidebar"] [data-testid="stFileUploaderFile"] button p { min-height:0 !important; height:auto !important; padding:0 !important; }
+    [data-testid="stSidebar"] [data-testid="stFileUploader"] [data-testid="stFileUploaderFile"] ~ button { margin-top:12px !important; }
+    [data-testid="stSidebar"] [data-testid="stSelectbox"] div[data-baseweb="select"] > div {
+      min-height:44px !important; background:#e6e1d8 !important; color:#1c1c27 !important; border:1px solid rgba(28,28,39,.3) !important;
+    }
+    [data-testid="stSidebar"] [data-testid="stSelectbox"] div[data-baseweb="select"] span,
+    [data-testid="stSidebar"] [data-testid="stSelectbox"] div[data-baseweb="select"] div { color:#1c1c27 !important; white-space:normal !important; }
+    [data-testid="stSidebar"] [data-baseweb="popover"], [data-testid="stSidebar"] [data-baseweb="popover"] * { background:#e6e1d8 !important; color:#1c1c27 !important; }
+    [data-testid="stSidebar"] li[data-baseweb="menu-item"] { color:#1c1c27 !important; background:#e6e1d8 !important; white-space:normal !important; }
+    [data-testid="stSidebar"] li[data-baseweb="menu-item"]:hover { color:#fff !important; background:#9c3118 !important; }
+    [data-testid="stSidebar"] [data-testid="stCaptionContainer"] { color:#9a9aa8 !important; }
+    [data-testid="stSidebar"] .model-caption, [data-testid="stSidebar"] .model-caption * { color:#c9c9d4 !important; }
+    [data-testid="stSidebar"] .eyebrow { color:#9a9aa8 !important; }
+    [data-testid="stSidebar"] [data-testid="stAlert"] { border-radius:8px !important; color:#1c1c27 !important; }
+    [data-testid="stSidebar"] [data-testid="stAlert"] * { color:#1c1c27 !important; }
+    [data-testid="stSidebar"] [data-testid="stFileUploaderFile"]:hover [data-testid="stFileUploaderFileName"] { text-decoration:underline; }
+    [data-testid="stSidebar"] [data-testid="stFileUploaderFileName"] { title:attr(data-testid); }
+    /* Final Streamlit uploader overrides: keep filenames, sizes, and controls readable. */
+    /* Native upload box filename: visible inside the existing cream row. */
+    /* Actual BaseWeb selectbox DOM: combobox value and option text. */
+    section[data-testid="stSidebar"] [data-testid="stSelectbox"] input[role="combobox"] {
+      color:#000000 !important;
+      -webkit-text-fill-color:#000000 !important;
+    }
+    section[data-testid="stSidebar"] [data-testid="stSelectbox"] [role="option"],
+    section[data-testid="stSidebar"] [data-testid="stSelectbox"] [role="option"] * {
+      color:#000000 !important;
+    }
+    section[data-testid="stSidebar"] [data-testid="stSelectbox"] [aria-selected="true"] {
+      color:#000000 !important;
+      -webkit-text-fill-color:#000000 !important;
+    }    /* Built-in corpus selectbox only: beige field with black value/options. */
+    [data-testid="stSidebar"] [data-testid="stSelectbox"] [data-baseweb="select"] > div,
+    [data-testid="stSidebar"] [data-testid="stSelectbox"] [data-baseweb="select"] span,
+    [data-testid="stSidebar"] [data-testid="stSelectbox"] [data-baseweb="select"] input {
+      color:#000000 !important;
+    }
+    [data-testid="stSidebar"] [data-testid="stSelectbox"] [data-baseweb="select"] svg {
+      fill:#000000 !important;
+      color:#000000 !important;
+    }
+    [data-baseweb="popover"] [data-baseweb="menu"] [data-baseweb="menu-item"],
+    [data-baseweb="popover"] [data-baseweb="menu"] [data-baseweb="menu-item"] * {
+      color:#000000 !important;
+    }    /* Target only light upload chips and the light corpus selectbox. */
+    [data-testid="stSidebar"] [data-testid="stFileChip"],
+    [data-testid="stSidebar"] [data-testid="stFileChip"] [data-testid="stFileChipName"],
+    [data-testid="stSidebar"] [data-testid="stFileChip"] [data-testid="stFileChipName"] *,
+    [data-testid="stSidebar"] [data-testid="stFileChip"] [data-testid="stFileChipName"] + div {
+      color:#000000 !important;
+      opacity:1 !important;
+    }
+    [data-testid="stSidebar"] [data-testid="stFileChip"] [data-testid="stFileChipName"] {
+      font-weight:600 !important;
+      text-shadow:none !important;
+    }
+    [data-testid="stSidebar"] [data-testid="stSelectbox"] [data-baseweb="select"] > div,
+    [data-testid="stSidebar"] [data-testid="stSelectbox"] [data-baseweb="select"] span,
+    [data-testid="stSidebar"] [data-testid="stSelectbox"] [data-baseweb="select"] div {
+      color:#000000 !important;
+      opacity:1 !important;
+    }
+    [data-testid="stSidebar"] [data-baseweb="popover"] li[data-baseweb="menu-item"],
+    [data-testid="stSidebar"] [data-baseweb="popover"] li[data-baseweb="menu-item"] * {
+      color:#000000 !important;
+      opacity:1 !important;
+    }    /* Streamlit 1.66 uses file chips for uploaded files. */
+    [data-testid="stSidebar"] [data-testid="stFileChip"],
+    [data-testid="stSidebar"] [data-testid="stFileChipName"],
+    [data-testid="stSidebar"] [data-testid="stFileChipName"] * {
+      color:#000000 !important;
+      opacity:1 !important;
+      visibility:visible !important;
+    }
+    [data-testid="stSidebar"] [data-testid="stFileChipName"] {
+      display:block !important;
+      max-width:calc(100% - 70px) !important;
+      overflow:hidden !important;
+      text-overflow:ellipsis !important;
+      white-space:nowrap !important;
+      font-size:13px !important;
+      font-weight:600 !important;
+    }
+    [data-testid="stSidebar"] [data-testid="stFileUploaderFile"] [data-testid="stFileUploaderFileName"],
+    [data-testid="stSidebar"] [data-testid="stFileUploaderFile"] [data-testid="stFileUploaderFileName"] *,
+    [data-testid="stSidebar"] [data-testid="stFileUploaderFile"] > div:not(:first-child) span,
+    [data-testid="stSidebar"] [data-testid="stFileUploaderFile"] > div:not(:first-child) p {
+      display:block !important; visibility:visible !important; opacity:1 !important;
+      color:#000000 !important; font-family:'Azeret Mono', monospace !important;
+      font-size:13px !important; font-weight:600 !important; line-height:1.25 !important;
+      white-space:nowrap !important; overflow:hidden !important; text-overflow:ellipsis !important;
+      min-width:0 !important; max-width:100% !important;
+    }
+    [data-testid="stSidebar"] [data-testid="stFileUploaderFile"] {
+      display:flex !important; align-items:center !important; gap:12px !important; padding:10px 12px !important;
+      background:#ddd7c8 !important; border-radius:8px !important; margin-bottom:8px !important; min-height:56px !important;
+    }
+    [data-testid="stSidebar"] [data-testid="stFileUploaderFile"] * { color:#1c1c27 !important; opacity:1 !important; }
+    [data-testid="stSidebar"] [data-testid="stFileUploaderFileName"] {
+      color:#1c1c27 !important; font-size:14px !important; font-weight:600 !important; white-space:nowrap !important;
+      overflow:hidden !important; text-overflow:ellipsis !important; max-width:100% !important;
+    }
+    [data-testid="stSidebar"] [data-testid="stFileUploaderFile"] small,
+    [data-testid="stSidebar"] [data-testid="stFileUploaderFile"] [data-testid="stFileUploaderFileSize"] {
+      color:#5b5b68 !important; font-size:12px !important;
+    }
+    [data-testid="stSidebar"] [data-testid="stIconMaterial"],
+    [data-testid="stSidebar"] .material-symbols-rounded,
+    [data-testid="stSidebar"] [class*="material-symbols"] {
+      font-family:"Material Symbols Rounded", "Material Symbols Outlined" !important;
+      font-feature-settings:"liga" !important; letter-spacing:normal !important; text-transform:none !important;
+    }
+    [data-testid="stSidebar"] [data-testid="stFileUploaderFile"] svg {
+      width:20px !important; height:20px !important; border:none !important; background:transparent !important;
+      color:#1c1c27 !important; fill:currentColor !important;
+    }
+    [data-testid="stSidebar"] [data-testid="stFileUploaderFile"] > div:first-child {
+      width:32px !important; height:32px !important; min-width:32px !important; border:none !important;
+      background:transparent !important; display:flex !important; align-items:center !important; justify-content:center !important;
+    }
+    [data-testid="stSidebar"] [data-testid="stFileUploaderDeleteBtn"] button,
+    [data-testid="stSidebar"] [data-testid="stFileUploaderFile"] button {
+      width:32px !important; height:32px !important; min-height:32px !important; padding:0 !important;
+      border-radius:50% !important; background:transparent !important; border:1px solid #5b5b68 !important;
+      color:#1c1c27 !important;
+    }
+    [data-testid="stSidebar"] [data-testid="stAlert"] p,
+    [data-testid="stSidebar"] [data-testid="stAlert"] * { color:#f1e9c8 !important; }
+    @media (max-width: 900px) {
+      .block-container { max-width:100% !important; padding-left:1rem !important; padding-right:1rem !important; }
+      h1,h2,h3 { overflow-wrap:anywhere !important; }
+    }
+    .workflow-canvas { background: #191A23; border: 1px solid rgba(26,25,23,.24); border-radius: 10px; min-width: 1450px; background-image: linear-gradient(rgba(247,243,234,.05) 1px, transparent 1px), linear-gradient(90deg, rgba(247,243,234,.05) 1px, transparent 1px); background-size: 24px 24px; }
+    .workflow-node { position:absolute; width:190px; min-height:92px; padding:12px 14px; border:1px solid rgba(247,243,234,.26); border-left:4px solid #7E7A71; border-radius:8px; background:#2C2D3B; color:#F7F3EA; box-shadow:0 8px 18px rgba(0,0,0,.18); }
+    .workflow-node.supported { border-left-color:#B85A31; } .workflow-node.unavailable { opacity:.55; border-left-color:#777; } .workflow-node.selected { outline:2px solid #E7A47D; }
+    .node-category { font:10px 'Azeret Mono', monospace; letter-spacing:.12em; text-transform:uppercase; color:#D9D4CB; } .node-title { font:17px 'Instrument Serif', Georgia, serif; margin:6px 0; color:#FFF; } .node-state { font:11px 'Azeret Mono', monospace; color:#E7A47D; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .node-port { position:absolute; width:10px; height:10px; background:#E7A47D; border:2px solid #191A23; border-radius:50%; top:42px; } .input-port { left:-7px; } .output-port { right:-7px; }
     </style>
 
     """,
     unsafe_allow_html=True,
 )
+
+
+WORKFLOW_BLOCKS = {
+    "Inputs": [
+        ("document_upload", "Document Upload", "Active uploaded files or the selected built-in corpus.", True),
+        ("user_question", "User Question", "The question currently entered in the QA interface.", True),
+        ("query_mode", "Query Mode", "Retrieval method and Top-K settings.", True),
+    ],
+    "Processing": [
+        ("text_extraction", "Text Extraction", "Text and page/slide metadata materialized by ingestion.", True),
+        ("preprocessing", "Preprocessing", "Normalized text prepared by the existing ingestion pipeline.", True),
+        ("chunk_generation", "Chunk Generation", "Actual chunks from the active index and configured overlap.", True),
+        ("bm25_index", "BM25 Index", "The active Okapi BM25 index.", True),
+        ("tfidf_index", "TF-IDF Index", "The active TF-IDF index.", True),
+        ("retrieval", "Retrieval", "Ranked passages returned for the last executed question.", True),
+        ("top_k", "Top-K Selection", "The configured number of candidate passages.", True),
+    ],
+    "AI": [
+        ("minilm_qa", "MiniLM QA", "The real extractive QA model response and answer span.", True),
+        ("cricket_knowledge", "Cricket Knowledge Retrieval", "The domain classifier and cricket-corpus guard.", True),
+        ("t5_question_generation", "T5 Question Generation", "Optional feature not implemented in the current backend.", False),
+    ],
+    "Conditions": [
+        ("index_ready", "Index Ready?", "Whether the selected corpus is active and indexed.", True),
+        ("evidence_found", "Evidence Found?", "Whether the last response contains sufficient evidence.", True),
+        ("answer_valid", "Answer Valid?", "Whether evidence validation accepted the extracted span.", True),
+        ("processing_failed", "Processing Failed?", "Whether the latest execution raised an error.", True),
+    ],
+    "Terminals / Outputs": [
+        ("answer_source", "Answer with Source", "Successful answer terminal with citation metadata.", True),
+        ("abstention", "Abstention", "Evidence-based insufficient-evidence terminal.", True),
+        ("index_ready_terminal", "Index Ready", "Index readiness terminal.", True),
+        ("processing_error", "Processing Error", "Processing error terminal.", True),
+    ],
+    "Inspectors": [
+        ("extracted_text", "Extracted Text", "Inspect extracted text from active documents.", True),
+        ("chunk_inspector", "Chunk Inspector", "Inspect actual chunks from the active index.", True),
+        ("retrieved_passages", "Retrieved Passages", "Inspect the passages returned in the last run.", True),
+        ("model_output", "Model Output", "Inspect the real MiniLM response object fields.", True),
+        ("validation_results", "Validation Results", "Inspect support, confidence, and citation validation.", True),
+    ],
+}
+
+WORKFLOW_DEFAULT_NODES = [
+    ("document_upload", "Document Upload", 30, 40),
+    ("text_extraction", "Text Extraction", 250, 40),
+    ("chunk_generation", "Chunk Generation", 470, 40),
+    ("retrieval", "Retrieval", 700, 40),
+    ("minilm_qa", "MiniLM QA", 930, 40),
+    ("answer_source", "Answer with Source", 1160, 10),
+    ("abstention", "Abstention", 1160, 130),
+    ("processing_error", "Processing Error", 1160, 250),
+]
+
+
+def _workflow_catalog():
+    return {block_id: {"id": block_id, "label": label, "description": description, "category": category, "supported": supported}
+            for category, blocks in WORKFLOW_BLOCKS.items() for block_id, label, description, supported in blocks}
+
+
+def _workflow_snapshot():
+    return {"nodes": deepcopy(st.session_state.workflow_nodes), "edges": deepcopy(st.session_state.workflow_edges)}
+
+
+def _workflow_restore(snapshot):
+    st.session_state.workflow_nodes = deepcopy(snapshot["nodes"])
+    st.session_state.workflow_edges = deepcopy(snapshot["edges"])
+
+
+def _workflow_commit():
+    st.session_state.workflow_undo.append(_workflow_snapshot())
+    st.session_state.workflow_redo.clear()
+
+
+def _workflow_output(block_id, corpus_index, last_run):
+    response = last_run.get("response") if last_run else None
+    passages = last_run.get("passages", []) if last_run else []
+    if block_id == "document_upload":
+        return f"{corpus_index.document_count if corpus_index else 0} active document(s)"
+    if block_id == "text_extraction":
+        words = sum(document.word_count for document in corpus_index.documents) if corpus_index else 0
+        return f"{words:,} extracted words"
+    if block_id == "preprocessing":
+        return "Active ingestion preprocessing"
+    if block_id == "chunk_generation":
+        return f"{corpus_index.chunk_count if corpus_index else 0:,} chunks"
+    if block_id in {"bm25_index", "tfidf_index"}:
+        return "Ready" if corpus_index else "Not available"
+    if block_id == "retrieval" or block_id == "retrieved_passages":
+        return f"{len(passages)} passage(s) from last run" if last_run else "No execution yet"
+    if block_id == "top_k":
+        return str(len(passages)) if last_run else "Not executed"
+    if block_id in {"minilm_qa", "model_output"}:
+        return (getattr(response, "answer", "") or "Abstained") if response else "No execution yet"
+    if block_id == "cricket_knowledge":
+        return "Domain guard active"
+    if block_id == "index_ready" or block_id == "index_ready_terminal":
+        return "Ready" if corpus_index else "Not ready"
+    if block_id in {"evidence_found", "answer_valid"}:
+        return "Yes" if response and getattr(response, "supported", False) else "No"
+    if block_id == "processing_failed":
+        return "No" if last_run else "No execution yet"
+    if block_id == "answer_source":
+        return f"{getattr(response, 'source', '')} · page {getattr(response, 'page', 'N/A')}" if response and getattr(response, "supported", False) else "Path not taken"
+    if block_id == "abstention":
+        return "Path taken" if response and not getattr(response, "supported", False) else "Path not taken"
+    if block_id == "processing_error":
+        return "Path not taken"
+    if block_id == "extracted_text":
+        return "Select a document in Active Corpus Documents for full text"
+    if block_id == "chunk_inspector":
+        return f"{corpus_index.chunk_count:,} chunks available" if corpus_index else "No chunks"
+    if block_id == "validation_results":
+        return ("supported=" + str(getattr(response, "supported", False)) + ", " +
+                "score=" + f"{getattr(response, 'qa_score', 0.0):.3f}") if response else "No execution yet"
+    return "Available"
+
+
+def _workflow_has_cycle(edges):
+    graph = {}
+    for source, target, _label in edges:
+        graph.setdefault(source, []).append(target)
+    visiting, visited = set(), set()
+    def visit(node):
+        if node in visiting:
+            return True
+        if node in visited:
+            return False
+        visiting.add(node)
+        if any(visit(child) for child in graph.get(node, [])):
+            return True
+        visiting.remove(node)
+        visited.add(node)
+        return False
+    return any(visit(node) for node in graph)
+
+
+def _render_workflow_builder(corpus_index, last_run):
+    catalog = _workflow_catalog()
+    st.markdown('<div class="section-rule"></div><div class="eyebrow">VISUAL WORKFLOW EDITOR</div>', unsafe_allow_html=True)
+    st.markdown("## Builder / Debug Execution")
+    st.caption("Builder edits the visual layout only. Debug / Execution reflects the fixed, tested DocuQA pipeline; rearranging nodes does not change backend execution order.")
+    builder_tab, execution_tab = st.tabs(["Builder", "Debug / Execution"])
+    with builder_tab:
+        toolbar = st.columns([1.2, 1.2, 1.2, 1.2, 1.2, 1.2])
+        with toolbar[0]:
+            if st.button("Add Block", key="workflow_add_open", use_container_width=True):
+                st.session_state.workflow_palette_open = not st.session_state.workflow_palette_open
+        with toolbar[1]:
+            if st.button("Undo", key="workflow_undo_btn", disabled=not st.session_state.workflow_undo, use_container_width=True):
+                st.session_state.workflow_redo.append(_workflow_snapshot())
+                _workflow_restore(st.session_state.workflow_undo.pop())
+                st.rerun()
+        with toolbar[2]:
+            if st.button("Redo", key="workflow_redo_btn", disabled=not st.session_state.workflow_redo, use_container_width=True):
+                st.session_state.workflow_undo.append(_workflow_snapshot())
+                _workflow_restore(st.session_state.workflow_redo.pop())
+                st.rerun()
+        with toolbar[3]:
+            if st.button("Fit Workflow", key="workflow_fit", use_container_width=True):
+                _workflow_commit()
+                st.session_state.workflow_nodes = {f"node_{i}": {"id": f"node_{i}", "block_id": block_id, "label": label, "x": x, "y": y} for i, (block_id, label, x, y) in enumerate(WORKFLOW_DEFAULT_NODES)}
+                st.rerun()
+        with toolbar[4]:
+            st.session_state.workflow_zoom = st.slider("Zoom", 60, 140, st.session_state.workflow_zoom, 10, key="workflow_zoom_slider")
+        with toolbar[5]:
+            st.session_state.workflow_pan = st.selectbox("Pan", ["Center", "Left", "Right"], key="workflow_pan_select")
+        if st.session_state.workflow_palette_open:
+            st.markdown("### Block palette")
+            palette_query = st.text_input("Search blocks", key="workflow_palette_query", placeholder="Search by block name or category")
+            options = []
+            for category, blocks in WORKFLOW_BLOCKS.items():
+                for block_id, label, description, supported in blocks:
+                    if palette_query.casefold() in f"{category} {label} {description}".casefold():
+                        options.append((f"{category} · {label}" + (" · unavailable" if not supported else ""), block_id))
+            if options:
+                selected_label = st.selectbox("Choose a block", [item[0] for item in options], key="workflow_palette_choice")
+                selected_id = dict(options)[selected_label]
+                if st.button("Place on canvas", key="workflow_place_block", disabled=not catalog[selected_id]["supported"]):
+                    _workflow_commit()
+                    node_id = f"node_{st.session_state.workflow_next_id}"
+                    st.session_state.workflow_next_id += 1
+                    block = catalog[selected_id]
+                    st.session_state.workflow_nodes[node_id] = {"id": node_id, "block_id": selected_id, "label": block["label"], "x": 100 + (len(st.session_state.workflow_nodes) % 4) * 240, "y": 360 + (len(st.session_state.workflow_nodes) // 4) * 130}
+                    st.session_state.workflow_selected = node_id
+                    st.rerun()
+                if not catalog[selected_id]["supported"]:
+                    st.warning("Unavailable: this block has no corresponding backend operation and cannot be placed.")
+        st.markdown("### Canvas")
+        scale = st.session_state.workflow_zoom / 100
+        canvas_html = '<div class="workflow-canvas" style="min-height:520px; position:relative; overflow:auto; transform-origin:top left; zoom:%s">' % scale
+        for node_id, node in st.session_state.workflow_nodes.items():
+            block = catalog[node["block_id"]]
+            selected = node_id == st.session_state.workflow_selected
+            state = _workflow_output(node["block_id"], corpus_index, last_run)
+            status = "supported" if block["supported"] else "unavailable"
+            canvas_html += (f'<div class="workflow-node {status} {"selected" if selected else ""}" style="left:{node["x"]}px;top:{node["y"]}px">'
+                            f'<div class="node-port input-port"></div><div class="node-category">{escape(block["category"])}</div>'
+                            f'<div class="node-title">{escape(node["label"])}</div><div class="node-state">{escape(state)}</div>'
+                            f'<div class="node-port output-port"></div></div>')
+        canvas_html += '</div>'
+        st.markdown(canvas_html, unsafe_allow_html=True)
+        st.caption("Canvas nodes expose distinct input/output ports. Use the node controls below to select, position, duplicate, delete, and connect nodes; browser drag persistence is intentionally not claimed by this Streamlit implementation.")
+        node_options = {f"{node['label']} [{node_id}]": node_id for node_id, node in st.session_state.workflow_nodes.items()}
+        if node_options:
+            selected_label = next((label for label, node_id in node_options.items() if node_id == st.session_state.workflow_selected), next(iter(node_options)))
+            selected_label = st.selectbox("Select block", list(node_options), index=list(node_options).index(selected_label), key="workflow_selected_label")
+            st.session_state.workflow_selected = node_options[selected_label]
+            node = st.session_state.workflow_nodes[st.session_state.workflow_selected]
+            block = catalog[node["block_id"]]
+            inspector_cols = st.columns([2.3, 1, 1, 1, 1])
+            with inspector_cols[0]:
+                st.markdown(f"**{block['category']} / {node['label']}**")
+                st.caption(block["description"])
+                st.write(f"**Execution state:** {_workflow_output(node['block_id'], corpus_index, last_run)}")
+                st.write(f"**Input metadata:** {('active corpus / upstream result' if node['block_id'] not in {'document_upload', 'user_question'} else 'user/session input')}")
+                st.write(f"**Output metadata:** {block['description']}")
+            with inspector_cols[1]:
+                new_x = st.number_input("X", 0, 1600, int(node["x"]), key=f"workflow_x_{st.session_state.workflow_selected}")
+            with inspector_cols[2]:
+                new_y = st.number_input("Y", 0, 1000, int(node["y"]), key=f"workflow_y_{st.session_state.workflow_selected}")
+            with inspector_cols[3]:
+                if st.button("Duplicate", key="workflow_duplicate"):
+                    _workflow_commit()
+                    new_id = f"node_{st.session_state.workflow_next_id}"
+                    st.session_state.workflow_next_id += 1
+                    st.session_state.workflow_nodes[new_id] = {**node, "id": new_id, "x": int(node["x"]) + 30, "y": int(node["y"]) + 30}
+                    st.session_state.workflow_selected = new_id
+                    st.rerun()
+            with inspector_cols[4]:
+                if st.button("Delete", key="workflow_delete", disabled=len(st.session_state.workflow_nodes) <= 1):
+                    _workflow_commit()
+                    deleted = st.session_state.workflow_selected
+                    st.session_state.workflow_nodes.pop(deleted, None)
+                    st.session_state.workflow_edges = [edge for edge in st.session_state.workflow_edges if edge[0] != deleted and edge[1] != deleted]
+                    st.session_state.workflow_selected = next(iter(st.session_state.workflow_nodes), None)
+                    st.rerun()
+            if (new_x, new_y) != (node["x"], node["y"]):
+                _workflow_commit()
+                node["x"], node["y"] = new_x, new_y
+        st.markdown("### Connections")
+        node_labels = {node_id: node["label"] for node_id, node in st.session_state.workflow_nodes.items()}
+        edge_cols = st.columns([2, 2, 1, 1])
+        with edge_cols[0]:
+            source = st.selectbox("Output port", list(node_labels), format_func=lambda value: node_labels[value], key="workflow_edge_source")
+        with edge_cols[1]:
+            target = st.selectbox("Input port", list(node_labels), format_func=lambda value: node_labels[value], key="workflow_edge_target")
+        with edge_cols[2]:
+            branch_label = st.text_input("Branch label", key="workflow_branch_label", placeholder="yes / no")
+        with edge_cols[3]:
+            if st.button("Connect", key="workflow_connect", disabled=source == target):
+                candidate = st.session_state.workflow_edges + [(source, target, branch_label.strip())]
+                if _workflow_has_cycle(candidate):
+                    st.error("Connection rejected: circular execution dependency detected.")
+                elif (source, target, branch_label.strip()) in st.session_state.workflow_edges:
+                    st.info("That connection already exists.")
+                else:
+                    _workflow_commit()
+                    st.session_state.workflow_edges.append((source, target, branch_label.strip()))
+                    st.rerun()
+        if st.session_state.workflow_edges:
+            for edge in st.session_state.workflow_edges:
+                label = f" · {edge[2]}" if edge[2] else ""
+                st.caption(f"{node_labels.get(edge[0], edge[0])} → {node_labels.get(edge[1], edge[1])}{label}")
+    with execution_tab:
+        st.info("Execution order is fixed by the tested backend: document ingestion → chunking → selected retrieval → Top-K → domain guard → MiniLM extraction → evidence validation → citation/abstention terminal.")
+        stages = [
+            ("Text Extraction", "text_extraction"), ("Chunk Generation", "chunk_generation"),
+            ("Retrieval", "retrieval"), ("MiniLM QA", "minilm_qa"),
+            ("Validation", "validation_results"), ("Terminal", "answer_source" if last_run and last_run.get("response") and getattr(last_run["response"], "supported", False) else "abstention"),
+        ]
+        for index, (label, block_id) in enumerate(stages, start=1):
+            st.markdown(f"**{index:02d} · {label}** — {_workflow_output(block_id, corpus_index, last_run)}")
+        if last_run:
+            response = last_run.get("response")
+            st.json({"elapsed_seconds": round(last_run.get("elapsed", 0.0), 3), "cache_hit": last_run.get("cache_hit", False), "answer": getattr(response, "answer", ""), "supported": getattr(response, "supported", False), "source": getattr(response, "source", None), "page": getattr(response, "page", None), "evidence": getattr(response, "evidence_text", "")})
+        else:
+            st.caption("Run a question to populate actual stage outputs.")
 
 SAMPLE_QUESTIONS = {
     "Laws and Regulations": [
@@ -612,9 +1101,25 @@ for key, value in {
     "fair_top_k_results": None,
     "fair_chunk_results": None,
     "final_report": None,
+    "detected_questions": [],
+    "invalid_document_warnings": [],
+    "workflow_nodes": {},
+    "workflow_edges": [],
+    "workflow_selected": None,
+    "workflow_next_id": 20,
+    "workflow_palette_open": False,
+    "workflow_palette_query": "",
+    "workflow_zoom": 100,
+    "workflow_pan": "Center",
+    "workflow_undo": [],
+    "workflow_redo": [],
 }.items():
     if key not in st.session_state:
         st.session_state[key] = value
+
+if not st.session_state.workflow_nodes:
+    st.session_state.workflow_nodes = {f"node_{i}": {"id": f"node_{i}", "block_id": block_id, "label": label, "x": x, "y": y} for i, (block_id, label, x, y) in enumerate(WORKFLOW_DEFAULT_NODES)}
+    st.session_state.workflow_selected = "node_0"
 
 if st.session_state.corpus_index is None:
     try:
@@ -630,6 +1135,11 @@ if st.session_state.corpus_index is None:
             [], CRICKET_CORPUS_DIR, DEFAULT_CHUNK_SIZE, DEFAULT_OVERLAP,
         )
         st.session_state.corpus_error = None
+        domain_clf = load_domain_classifier_model()
+        st.session_state.detected_questions = detect_document_questions(
+            cached_result.index.documents,
+            domain_classifier=domain_clf,
+        )
     except (OSError, ValueError, RuntimeError) as exc:
         st.session_state.corpus_error = str(exc)
 
@@ -642,11 +1152,37 @@ with st.expander("System Instructions & Workflow", expanded=False):
     st.markdown(
         """
 1. **Query Input**: Enter a question regarding cricket laws, player positions, match formats, or scoring.
-2. **Retrieval**: The system searches candidate passages via TF-IDF or BM25 vector space models.
-3. **Extraction**: The extractive Transformer identifies candidate answer spans.
-4. **Attribution & Verification**: Validated answers display with supporting passage highlights and exact document citations.
+2. **Domain Classification**: Supervised ML verifies the query belongs to the Cricket domain; out-of-domain queries are rejected.
+3. **Retrieval**: Candidate passages are retrieved via Okapi BM25 (or TF-IDF baseline).
+4. **Extraction**: The fine-tuned MiniLM extractive model extracts exact answer spans.
+5. **Attribution & Verification**: Validated answers display with supporting passage highlights and exact document citations (Slide / Page).
         """
     )
+
+if st.session_state.get("invalid_document_warnings"):
+    for doc_name, conf, reason in st.session_state["invalid_document_warnings"]:
+        st.warning(
+            f"⚠️ **Unsupported Document Domain:** `{escape(doc_name)}` "
+            f"does not match the expected Cricket domain ({escape(reason)}). "
+            f"This system is domain-specific for Cricket documentation."
+        )
+
+detected_qs = st.session_state.get("detected_questions", [])
+if detected_qs:
+    with st.expander(f"📋 Detected Document Questions ({len(detected_qs)} found in active documents)", expanded=False):
+        st.caption("The system automatically extracts and classifies question prompts from your uploaded slides and documents.")
+        for idx, item in enumerate(detected_qs[:30]):
+            col_q, col_meta, col_act = st.columns([6, 3, 2])
+            with col_q:
+                st.markdown(f"**{escape(item.question)}**")
+            with col_meta:
+                domain_badge = "🏏 Cricket" if item.domain == "Cricket" else "⚠️ Out-of-Domain"
+                loc = f"{item.location_type} {item.page_or_slide}" if item.page_or_slide is not None else "Page N/A"
+                st.caption(f"{escape(item.source)} ({loc}) · {domain_badge} · {item.question_type}")
+            with col_act:
+                if st.button("Ask this", key=f"ask_det_{idx}_{item.chunk_id}", use_container_width=True):
+                    _set_question_from_sample(item.question)
+                    st.rerun()
 
 with st.sidebar:
     st.markdown("### Document Corpus")
@@ -662,11 +1198,6 @@ with st.sidebar:
     if uploads:
         upload_bytes_total = sum(item.size for item in uploads)
         st.markdown(f"**Selected documents**  \n{len(uploads)} documents · {upload_bytes_total / (1024 * 1024):.1f} MB")
-        for item in uploads:
-            st.markdown(
-                f'<div class="selected-upload-file" style="color:#1A1917;">✓ {escape(item.name)}</div>',
-                unsafe_allow_html=True,
-            )
         try:
             cached_count, pending_count, total_count = cache_status(
                 ((item.name, item.getvalue()) for item in uploads),
@@ -733,20 +1264,25 @@ with st.sidebar:
             st.session_state.active_corpus_signature = corpus_signature(
                 upload_bytes, selected_dir, int(chunk_size), int(overlap),
             )
-            qa_model_started = time.perf_counter()
-            try:
-                with st.spinner("Loading the local QA model once for fast questions..."):
-                    load_qa_model()
-                st.session_state.qa_model_ready = True
-                st.session_state.qa_model_load_seconds = time.perf_counter() - qa_model_started
-                st.session_state.qa_model_error = None
-            except (OSError, RuntimeError, ValueError) as exc:
-                # Indexing remains usable even if the optional model cannot be
-                # downloaded or loaded; the first question will show the same
-                # actionable error instead of silently using a fake answer.
-                st.session_state.qa_model_ready = False
-                st.session_state.qa_model_load_seconds = None
-                st.session_state.qa_model_error = str(exc)
+            domain_clf = load_domain_classifier_model()
+            invalid_docs = []
+            for doc in cached_result.index.documents:
+                doc_text = " ".join(c.text for c in doc.chunks[:5])
+                doc_domain = domain_clf.classify_document(doc_text)
+                if not doc_domain.is_cricket:
+                    invalid_docs.append((doc.filename, doc_domain.confidence, doc_domain.reason))
+            st.session_state.invalid_document_warnings = invalid_docs
+            st.session_state.detected_questions = detect_document_questions(
+                cached_result.index.documents,
+                domain_classifier=domain_clf,
+            )
+            # Keep indexing independent from the expensive MiniLM checkpoint load.
+            # The model is loaded lazily by the first feature that needs QA
+            # (Search, question generation, or batch QA) and then reused through
+            # Streamlit's resource cache. This keeps Upload -> Index responsive.
+            st.session_state.qa_model_ready = False
+            st.session_state.qa_model_load_seconds = None
+            st.session_state.qa_model_error = None
             st.session_state.corpus_error = None
             st.session_state.corpus_revision += 1
             st.session_state.last_answer_run = None
@@ -781,30 +1317,36 @@ with st.sidebar:
         on_click=_clear_corpus,
         help="Clears uploaded files and indexes. The default corpus can be indexed again afterward.",
     )
-    st.markdown('<div class="section-rule"></div><div class="eyebrow">EXTRACTIVE QA MODEL</div>', unsafe_allow_html=True)
-    st.caption(DEFAULT_QA_MODEL)
-    st.caption("Local checkpoint. Extractive span inference runs on CPU/GPU without external API calls.")
+    st.markdown('<div class="section-rule"></div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="eyebrow">EXTRACTIVE QA MODEL</div><div class="model-caption"><strong>{escape(DEFAULT_QA_MODEL)}</strong><br>Local checkpoint. Extractive span inference runs on CPU/GPU without external API calls.</div>', unsafe_allow_html=True)
 
-corpus_index = st.session_state.corpus_index
+loaded_corpus_index = st.session_state.corpus_index
+# Never present the previous index as current while a new document selection is pending.
+corpus_index = loaded_corpus_index if not corpus_selection_pending else None
 if st.session_state.get("corpus_error"):
     st.error(f"Corpus setup failed: {st.session_state.corpus_error}")
 if corpus_index is None:
-    st.info("No corpus is available yet. Choose a built-in corpus or upload documents, then click **Index Documents** in the left sidebar.")
-else:
     status_col1, status_col2, status_col3, status_col4 = st.columns(4)
-    status_col1.metric("Indexed Documents", corpus_index.document_count)
-    status_col2.metric("Total Chunks", corpus_index.chunk_count)
-    status_col3.metric("Extracted Words", f"{sum(document.word_count for document in corpus_index.documents):,}")
-    status_col4.metric("Index Status", "Build required" if corpus_selection_pending else "Ready")
+    status_col1.metric("Indexed Documents", "—")
+    status_col2.metric("Total Chunks", "—")
+    status_col3.metric("Extracted Words", "—")
+    status_col4.metric("Index Status", "Not built")
     if corpus_selection_pending:
         pending_count = len(selected_upload_bytes) if selected_upload_bytes else sum(
             1 for path in Path(selected_dir).iterdir() if path.is_file()
         )
         st.info(
-            f"Current active corpus: {corpus_index.document_count} document(s). "
-            f"Pending selection: {pending_count} document(s); "
-            "Build / Update Index required."
+            f"Pending selection: {pending_count} document(s). "
+            "Build / Update Index to activate this exact selection."
         )
+    else:
+        st.info("No corpus is available yet. Choose a built-in corpus or upload documents, then click **Build / Update Index** in the left sidebar.")
+else:
+    status_col1, status_col2, status_col3, status_col4 = st.columns(4)
+    status_col1.metric("Indexed Documents", corpus_index.document_count)
+    status_col2.metric("Total Chunks", corpus_index.chunk_count)
+    status_col3.metric("Extracted Words", f"{sum(document.word_count for document in corpus_index.documents):,}")
+    status_col4.metric("Index Status", "Ready")
     timing = st.session_state.get("corpus_timing")
     if timing is not None:
         with st.expander("Technical diagnostics", expanded=False):
@@ -851,6 +1393,8 @@ else:
                     )
         else:
             st.info("No built-in cricket questions matched this upload yet. Enter a question below about the document's terminology, rules, or definitions.")
+
+_render_workflow_builder(corpus_index, st.session_state.last_answer_run)
 
 with st.expander("Retrieval Parameters", expanded=False):
     adv_col1, adv_col2 = st.columns(2)
@@ -920,6 +1464,7 @@ if ask_triggered and corpus_index is not None and question.strip():
             started_at = time.perf_counter()
             with st.spinner("Searching indexed documents and extracting exact answer span..."):
                 model = load_qa_model()
+                domain_clf = load_domain_classifier_model()
                 st.session_state.qa_model_ready = True
                 passages, response = ask_indexed_corpus(
                     corpus_index,
@@ -927,6 +1472,7 @@ if ask_triggered and corpus_index is not None and question.strip():
                     method,
                     int(top_k),
                     model,
+                    domain_classifier=domain_clf,
                 )
             elapsed = time.perf_counter() - started_at
             st.session_state.answer_cache[answer_key] = (passages, response, elapsed)
@@ -952,7 +1498,18 @@ if last_run is not None and last_run["signature"] == signature:
     st.markdown('<div class="section-rule"></div>', unsafe_allow_html=True)
     timing_label = "from session cache" if last_run.get("cache_hit") else "fresh inference"
     st.caption(f"Query completed in {last_run.get('elapsed', 0.0):.2f} seconds · {timing_label}")
-    if response.supported:
+    if getattr(response, "is_out_of_domain", False):
+        st.markdown("## 🚫 Out-of-Domain Question Rejected")
+        st.markdown(
+            f'<div style="font-size: 16px; font-weight: 500; color: #721C24; margin: 12px 0 20px; padding: 16px 20px; background: #F8D7DA; border-left: 5px solid #DC3545; border-radius: 4px;">'
+            f'<strong>Out-of-Domain Question Rejected</strong><br><br>'
+            f'{escape(response.answer)}<br><br>'
+            f'<span style="font-size: 13px; color: #555;">'
+            f'Domain Classifier: <strong>Other Domain</strong> (Confidence: {response.qa_score:.1%}) · System is specialized for Cricket document Q&A only.</span>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+    elif response.supported:
         st.markdown("## Answer")
         st.markdown(
             f'<div style="font-size: 24px; font-weight: 600; color: var(--ink); margin: 12px 0 20px; padding: 14px 20px; background: rgba(155, 52, 24, 0.06); border-left: 4px solid var(--oxide);">'
@@ -1050,17 +1607,47 @@ with st.expander("Sample Queries & Examples", expanded=True):
                     st.button(q, key=f"sample_{q}", on_click=_set_question_from_sample, args=(q,), use_container_width=True)
 
 
+with st.expander("🛡️ Domain Guard — Live Demo", expanded=False):
+    st.markdown("### Domain Classification Live Test")
+    st.caption(
+        "Test the trained Cricket vs. Other domain classifier. "
+        "Cricket questions proceed to BM25 → MiniLM. Non-cricket questions are rejected immediately."
+    )
+    domain_test_q = st.text_input(
+        "Enter any question to classify",
+        placeholder='e.g. "Who invented Python?" or "What is LBW in cricket?"',
+        key="domain_guard_test_q",
+    )
+    if domain_test_q.strip():
+        _clf = load_domain_classifier_model()
+        _dom_res = _clf.classify_question(domain_test_q.strip())
+        if _dom_res.is_cricket:
+            st.success(
+                f"✅ **Cricket Domain Accepted** (confidence: {_dom_res.cricket_probability:.1%})  \n"
+                f"{_dom_res.reason}  \n"
+                f"→ This question will proceed to BM25 retrieval + MiniLM extraction."
+            )
+        else:
+            st.error(
+                f"🚫 **Out-of-Domain Rejected** (cricket probability: {_dom_res.cricket_probability:.1%})  \n"
+                f"{_dom_res.reason}  \n"
+                f"→ System returns: *{chr(34)}Out-of-domain question. This system is for cricket Q&A only.{chr(34)}*"
+            )
+
 with st.expander("Architecture Pipeline", expanded=False):
     st.markdown(
         """
 **Inference Sequence:**
 
-1. **Document Ingestion**: Parsing PDF, PPTX, DOCX, TXT, and Markdown files.
-2. **Text Chunking**: Sliding word-window chunking with configurable overlap.
-3. **Information Retrieval**: Term-frequency / inverse-document-frequency (TF-IDF) or Okapi BM25 scoring.
-4. **Passage Ranking**: Top-K most relevant passage chunks selected.
-5. **Extractive Inference**: Hugging Face Transformer pinpoints exact token start and end positions.
-6. **Evidence Verification & Abstention**: Verifies verbatim substring presence and positive confidence margin over null token.
+1. **Document Ingestion**: Parsing PDF, PPTX (slide-by-slide), DOCX, TXT, and Markdown files with page/slide metadata.
+2. **Text Chunking**: Sliding word-window chunking (120 words / 20 overlap) preserving source location.
+3. **Document Domain Validation**: Supervised TF-IDF + Logistic Regression classifier rejects non-cricket documents at upload time.
+4. **Question Detection**: Automatically extracts and classifies question prompts from slides and documents.
+5. **Question Domain Guard**: Classifies each user question as Cricket or Other — out-of-domain queries are rejected before retrieval.
+6. **Information Retrieval (Baseline: TF-IDF / Production: BM25)**: Okapi BM25 retrieves the Top-5 most relevant passages.
+7. **Extractive QA (Fine-tuned MiniLM)**: `deepset/minilm-uncased-squad2` fine-tuned on 571 cricket QA pairs extracts exact answer spans.
+8. **Evidence Verification & Abstention**: Verifies verbatim substring presence; returns *Insufficient evidence* when confidence is below threshold.
+9. **Source Attribution**: Returns document name, Slide number / Page number, and highlighted evidence span.
         """
     )
 

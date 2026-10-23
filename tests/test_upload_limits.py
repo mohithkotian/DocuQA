@@ -5,7 +5,7 @@ from docuqa.config import ALLOWED_EXTENSIONS, MAX_UPLOAD_BYTES, validate_upload_
 
 def test_upload_limit_is_100_mib_and_preserves_supported_formats() -> None:
     assert MAX_UPLOAD_BYTES == 100 * 1024 * 1024
-    assert ALLOWED_EXTENSIONS == {".pdf", ".txt", ".docx", ".md", ".markdown"}
+    assert ALLOWED_EXTENSIONS == {".pdf", ".pptx", ".txt", ".docx", ".md", ".markdown"}
 
 
 def test_pdf_around_70_mb_is_accepted_by_upload_validation() -> None:

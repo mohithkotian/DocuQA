@@ -26,6 +26,9 @@ class QAResponse:
     qa_score: float | None = None
     retrieval_score: float | None = None
     supported: bool = False
+    domain: str = "cricket"
+    domain_confidence: float | None = None
+    is_out_of_domain: bool = False
 
 
 @dataclass(frozen=True)

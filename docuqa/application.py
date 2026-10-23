@@ -9,6 +9,7 @@ import time
 from typing import Iterable
 
 from .bm25 import BM25Retriever
+from .classifier import DomainClassifier, OUT_OF_DOMAIN_REJECTION_MESSAGE
 from .ingestion import Document, IngestionTiming, ingest_documents, ingest_documents_timed
 from .qa import LocalExtractiveQAModel, QAResponse
 from .retrieval import SearchResult, TfidfRetriever
@@ -146,13 +147,33 @@ def build_corpus_index(uploaded_files: Iterable[tuple[str, bytes]], sample_corpu
 
 
 def ask_indexed_corpus(index: CorpusIndex, question: str, method: str,
-                       top_k: int, qa_model: LocalExtractiveQAModel
+                       top_k: int, qa_model: LocalExtractiveQAModel,
+                       domain_classifier: DomainClassifier | None = None
                        ) -> tuple[list[SearchResult], QAResponse]:
-    """Retrieve top-k evidence with one selected engine, then extract and validate."""
+    """Retrieve top-k evidence with one selected engine, then extract and validate.
+
+    If domain_classifier is provided, validates that the question belongs to
+    the Cricket domain before searching; otherwise immediately rejects out-of-domain queries.
+    """
     if not question or not question.strip():
         raise ValueError("question must be a non-empty string")
     if top_k < 1:
         raise ValueError("top_k must be at least 1")
+
+    # Domain Guardrail: Reject questions outside the cricket domain
+    if domain_classifier is not None:
+        classification = domain_classifier.classify_question(question)
+        if not classification.is_cricket:
+            rejection_response = QAResponse(
+                answer=OUT_OF_DOMAIN_REJECTION_MESSAGE,
+                qa_score=classification.confidence,
+                supported=False,
+                domain="other",
+                domain_confidence=classification.confidence,
+                is_out_of_domain=True,
+            )
+            return [], rejection_response
+
     passages = index.retriever(method).search(question, top_k=top_k)
     response = qa_model.answer_from_passages(question, passages)
     return passages, response

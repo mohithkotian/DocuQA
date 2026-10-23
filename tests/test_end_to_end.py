@@ -3,7 +3,10 @@ from pathlib import Path
 import pytest
 
 from docuqa import (
+    DEFAULT_CLASSIFIER_PATH,
+    DomainClassifier,
     INSUFFICIENT_EVIDENCE,
+    OUT_OF_DOMAIN_REJECTION_MESSAGE,
     QAResponse,
     ask_indexed_corpus,
     build_corpus_index,
@@ -98,3 +101,26 @@ def test_corpus_index_rejects_unknown_retrieval_method(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="method"):
         ask_indexed_corpus(index, "How many deliveries?", "unknown", 3, DeterministicQAModel())
+
+
+def test_ask_indexed_corpus_rejects_out_of_domain_question(tmp_path: Path) -> None:
+    index = build_corpus_index(
+        [("notes.txt", b"An over contains six legal deliveries in cricket.")],
+        tmp_path,
+    )
+    classifier = DomainClassifier.load(DEFAULT_CLASSIFIER_PATH)
+
+    passages, response = ask_indexed_corpus(
+        index,
+        "Who is the president of India?",
+        "BM25",
+        top_k=3,
+        qa_model=DeterministicQAModel(),
+        domain_classifier=classifier,
+    )
+
+    assert passages == []
+    assert not response.supported
+    assert response.is_out_of_domain
+    assert response.answer == OUT_OF_DOMAIN_REJECTION_MESSAGE
+    assert response.domain == "other"

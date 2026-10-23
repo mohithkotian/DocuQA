@@ -1,0 +1,458 @@
+text,domain,category
+What example notation is used to illustrate runs for wickets?,cricket,cricket_format
+What lead is required to enforce the follow-on in a five-day Test match?,cricket,cricket_unanswerable
+Can you give me tips for healthy morning breakfast recipes?,other,conversational
+Law 36: Leg Before Wicket (LBW) Conditions and Guidelines,cricket,cricket_document
+From where is the next over delivered?,cricket,cricket_position
+What term describes the six legal deliveries bowled in sequence?,cricket,cricket_definition
+What modification occurs when an over concludes?,cricket,cricket_procedure
+When did India gain independence from British rule?,other,general_knowledge
+How many innings does each team normally play in a Test?,cricket,cricket_numeric
+Explain the rules of rotation and Libero position in indoor volleyball.,other,other_sports
+What two tactical decisions does the captain determine?,cricket,cricket_role
+What type of ball gets to the batter quickly?,cricket,cricket_description
+How is a team's overall score calculated in cricket?,cricket,cricket_definition
+How must the ball clear the boundary to be awarded six runs?,cricket,cricket_condition
+Explain gradient descent and backpropagation.,other,tech_cs
+Which tournament stage eliminates teams upon suffering a defeat?,cricket,cricket_definition
+powerplay overs restrictions,cricket,cricket_short
+What innings restriction is dictated by the tournament format?,cricket,cricket_rule
+Can a match begin if a team arrives with only nine players at the ground?,cricket,cricket_unanswerable
+What is a slam dunk in basketball?,other,other_sports
+How many points is a touchdown worth in American football?,other,other_sports
+"What are plate boundaries: divergent, convergent, and transform faults?",other,science_math
+Who initiates an appeal before an umpire rules a dismissal?,cricket,cricket_role
+Tennis Grand Slam Tournament Guidelines and Court Specifications,other,other_sports
+What type of player can field but not automatically bat or bowl?,cricket,cricket_definition
+What is scored when the ball hits the ground before reaching the boundary?,cricket,cricket_rule
+Who was Nelson Mandela and what was the anti-apartheid movement?,other,general_knowledge
+Which match formats can a tournament feature?,cricket,cricket_list
+organic chemistry reactions,other,science_math
+Under what circumstance are four runs awarded for a boundary?,cricket,cricket_condition
+What action defines the striker's role at the crease?,cricket,cricket_description
+How long is a standard NBA basketball game?,other,other_sports
+hotel reservation discount,other,conversational
+prime minister election,other,general_knowledge
+What is overfitting in machine learning models and how to prevent it?,other,tech_cs
+How is scoring determined in gymnastics artistic all-around competition?,other,other_sports
+What protective gear is a wicketkeeper legally allowed to wear on their hands?,cricket,cricket_unanswerable
+Where must a fielder stay while securing control of a catch?,cricket,cricket_position
+"Explain the periodic table trends: electronegativity, ionization energy, and atomic radius.",other,science_math
+What action on the wicket completes a run out?,cricket,cricket_procedure
+"Slide 4: Machine Learning Pipeline - Data Cleaning, Feature Engineering, and Training",other,tech_cs
+What is the release speed of a standard international fast delivery in miles per hour?,cricket,cricket_unanswerable
+By what two primary means do batters score runs?,cricket,cricket_list
+What are the two objectives of using a bat in cricket?,cricket,cricket_purpose
+Where is the non-striker positioned during a delivery?,cricket,cricket_position
+What term describes deliveries that violate the laws of the over?,cricket,cricket_definition
+Which player has the duty to bowl an additional ball following an infraction?,cricket,cricket_role
+What is an ecosystem and what are trophic levels?,other,science_math
+photosynthesis plant biology,other,science_math
+What is the capital city of Canada?,other,general_knowledge
+deep learning neural network,other,tech_cs
+What is continuous integration and continuous deployment (CI/CD)?,other,tech_cs
+What specific score example is provided in the scoring rules?,cricket,cricket_format
+How many Grand Slam tournaments are played in a tennis calendar year?,other,other_sports
+What is a penalty corner in field hockey?,other,other_sports
+Who is permitted to field for a player who is absent?,cricket,cricket_role
+What specific restriction is imposed on each innings in Twenty20?,cricket,cricket_rule
+What are the three branches of the United States government?,other,general_knowledge
+rest api documentation,other,tech_cs
+What extra run is taken after the ball hits the batter's body while playing a shot?,cricket,cricket_definition
+How are the captain's leadership responsibilities described?,cricket,cricket_role
+What delivery requirement is fundamental to a bowler's role?,cricket,cricket_rule
+Is a catch considered valid if the ball lodges inside a fielder's protective helmet?,cricket,cricket_unanswerable
+FIFA Football Official Rules and Regulations Handbook,other,other_sports
+What rule classification applies to a no-ball?,cricket,cricket_definition
+quantum physics mechanics,other,science_math
+olympic 100m sprint final,other,other_sports
+How does an mRNA vaccine provide immunity against viruses?,other,science_math
+Tell me a funny joke to make me laugh.,other,conversational
+Which deliveries are identified as illegal in bowling?,cricket,cricket_list
+How does garbage collection work in Java?,other,tech_cs
+Can a batter score an all-run four without hitting a boundary?,cricket,cricket_unanswerable
+Where does the defensive team station its players on the ground?,cricket,cricket_position
+What is object-oriented programming and polymorphism?,other,tech_cs
+"ICC Tournaments: Cricket World Cup, T20 World Cup, and Champions Trophy",cricket,cricket_document
+How do kidneys filter blood and maintain electrolyte balance in humans?,other,science_math
+How do batters score runs when not hitting boundaries?,cricket,cricket_procedure
+Where was the 1983 Cricket World Cup final played?,cricket,cricket_unanswerable
+How many runs is a boundary six worth?,cricket,cricket_numeric
+How is a bye defined in cricket?,cricket,cricket_definition
+Explain supply and demand elasticity and market equilibrium pricing.,other,science_math
+"Software Engineering: Agile methodologies, Scrum sprints, user stories, and test driven development.",other,tech_cs
+How many batters are on the field simultaneously for the batting team?,cricket,cricket_numeric
+Can a batter be stumped off a wide delivery?,cricket,cricket_unanswerable
+What is the tallest mountain peak in the world above sea level?,other,general_knowledge
+database indexing b-tree,other,tech_cs
+Which stroke is executed primarily for defensive protection?,cricket,cricket_description
+What is the offside rule in association football?,other,other_sports
+What end is chosen for the next set of six deliveries?,cricket,cricket_position
+When is a run considered completed?,cricket,cricket_condition
+After what occurrence is a team eliminated from a knockout stage?,cricket,cricket_condition
+What dismisses the batter when a fielder secures the ball before it bounces?,cricket,cricket_definition
+What extra run is taken when the ball passes untouched by bat or body?,cricket,cricket_definition
+NBA Basketball Coaching Playbook and Tactical Formations,other,other_sports
+How does public key cryptography and RSA encryption work?,other,tech_cs
+What is the result for the team achieving the greater total in an ODI?,cricket,cricket_rule
+What is the Pythagorean theorem and how is it calculated?,other,science_math
+In what manner does a substitute not take on the absent player's roles?,cricket,cricket_rule
+What extra does a no-ball give unless more runs are scored?,cricket,cricket_numeric
+Explain how solar panels convert sunlight into electricity via photovoltaic effect.,other,science_math
+"Global Geography: Continental Drift, Plate Tectonics, and Mountain Formations",other,general_knowledge
+basketball nba playoffs,other,other_sports
+How many players make up a cricket team?,cricket,cricket_numeric
+What obligation falls upon the bowler when a wide or no-ball is bowled?,cricket,cricket_procedure
+What limitation does each team have in a limited-overs contest?,cricket,cricket_rule
+What must the ball touch for a leg bye to be considered?,cricket,cricket_condition
+Which extra involves no contact with either the bat or the body?,cricket,cricket_definition
+What does the final of a tournament determine?,cricket,cricket_definition
+Who crosses between the wickets during a run?,cricket,cricket_role
+What is the definition of extras in cricket?,cricket,cricket_definition
+Which delivery reaches the batter rapidly?,cricket,cricket_description
+What behavior identifies a spin delivery?,cricket,cricket_description
+What is the scheduled duration of a Test match?,cricket,cricket_duration
+What is the legal limit in degrees for elbow extension during bowling?,cricket,cricket_unanswerable
+How many fielders are allowed outside the ring during powerplay one of an ODI?,cricket,cricket_unanswerable
+Data Structures and Algorithms: Graph Traversal BFS and DFS,other,tech_cs
+Who holds the world record for the 100m sprint?,other,other_sports
+What restriction is placed on a substitute regarding batting and bowling?,cricket,cricket_rule
+What is the United Nations General Assembly and where is its headquarters?,other,general_knowledge
+Explain the theory of general relativity proposed by Albert Einstein.,other,science_math
+What is the role of the World Health Organization (WHO) during global pandemics?,other,general_knowledge
+When is a boundary shot credited with four runs?,cricket,cricket_condition
+What is the difference between microeconomics and macroeconomics?,other,science_math
+Microbiology: Bacterial Cell Wall Synthesis and Antimicrobial Resistance,other,science_math
+World History: The Causes and Consequences of World War I,other,general_knowledge
+Tips for beginner acoustic guitar chord transitions,other,conversational
+What set of regulations must a legal delivery conform to?,cricket,cricket_rule
+How many players are on a football team on the pitch?,other,other_sports
+What two deliveries are classified as illegal deliveries?,cricket,cricket_list
+What represents the combined sum of batter runs and extras?,cricket,cricket_definition
+Constitutional Law: Fundamental Rights and Judicial Review,other,general_knowledge
+united nations summit,other,general_knowledge
+Explain the fundamental theorem of calculus connecting derivatives and integrals.,other,science_math
+What consists of six legal deliveries?,cricket,cricket_definition
+When is the team with the higher score declared the winner?,cricket,cricket_condition
+Which format limits each team's innings to 20 overs?,cricket,cricket_definition
+What action must the bowler perform within the permitted area?,cricket,cricket_procedure
+Explain the greenhouse effect and global warming.,other,science_math
+What does a victorious team in a semi-final become?,cricket,cricket_role
+Where do slips stand relative to the wicketkeeper?,cricket,cricket_position
+What are the exact dimensions of the wide line markings on the pitch?,cricket,cricket_unanswerable
+What is the physical position of the batter relative to the wicket?,cricket,cricket_position
+What is the function of red blood cells in the human body?,other,science_math
+"Bowling Actions, Run-ups, No-Balls, and Wides",cricket,cricket_document
+What is completed when both batters reach the opposite ends?,cricket,cricket_definition
+"What is a birdie, eagle, and bogey in golf tournament scoring?",other,other_sports
+Who is the current Prime Minister of the United Kingdom?,other,general_knowledge
+How many overs does each side receive in Twenty20 cricket?,cricket,cricket_numeric
+What championship title is awarded to the winners of the final?,cricket,cricket_definition
+Slide 7: Cybersecurity Protocols - Multi-Factor Authentication and Encryption at Rest,other,tech_cs
+Who holds the record for scoring the fastest half-century in international cricket?,cricket,cricket_unanswerable
+How does the Duckworth-Lewis-Stern method calculate a revised target score?,cricket,cricket_unanswerable
+When does a boundary hit receive six runs?,cricket,cricket_condition
+What is the weather forecast for tomorrow?,other,conversational
+What does a knockout stage do when a team loses?,cricket,cricket_rule
+How many fielders are legally permitted on the leg side behind square at the instant of delivery?,cricket,cricket_unanswerable
+What is supervised learning in machine learning?,other,tech_cs
+How many innings are in a standard Major League Baseball game?,other,other_sports
+What is the national animal of India?,other,general_knowledge
+Who was Leonardo da Vinci and what were his major scientific contributions?,other,general_knowledge
+What type of match provides each side one innings with a 50-over cap?,cricket,cricket_definition
+What is the difference between renewable and non-renewable energy resources?,other,general_knowledge
+calculus differential equations,other,science_math
+What is the difference between DNA and RNA?,other,science_math
+fifa world cup schedule,other,other_sports
+How are treaties ratified under international diplomacy?,other,general_knowledge
+What is the purpose of an operating system kernel?,other,tech_cs
+What is a bouncer delivery?,cricket,cricket_definition
+What condition must be satisfied before an over is officially concluded?,cricket,cricket_rule
+Who is the president of India?,other,general_knowledge
+What dictates whether matches are limited-overs or multi-day?,cricket,cricket_rule
+Which foot violation illustrates a bowler infraction?,cricket,cricket_rule
+What is the chemical reaction involved in photosynthesis?,other,science_math
+Where do batters move that fielders try to control?,cricket,cricket_position
+How many players are on the court per team in badminton doubles?,other,other_sports
+What caused the fall of the Western Roman Empire in 476 AD?,other,general_knowledge
+What format of cricket is named after its twenty-over limit?,cricket,cricket_definition
+What penalty is imposed if a fielder intentionally stops the ball with a piece of clothing?,cricket,cricket_unanswerable
+What is the currency used in Japan?,other,general_knowledge
+weather forecast report,other,conversational
+What is a leg bye in cricket scoring?,cricket,cricket_definition
+What is the role of insulin in regulating blood glucose levels?,other,science_math
+What choices does the captain make regarding defense and bowling?,cricket,cricket_role
+"Chapter 4: Process Synchronization, Critical Sections, Semaphores, and Mutex Locks",other,tech_cs
+What physical status relative to the crease allows a run out?,cricket,cricket_position
+Who breaks the wicket in a stumping dismissal?,cricket,cricket_role
+football premier league standings,other,other_sports
+Can a captain declare an innings closed in a 50-over ODI?,cricket,cricket_unanswerable
+When does the striker change during an over?,cricket,cricket_condition
+What is the capital of Australia?,other,general_knowledge
+What is the distinguishing trait of a fast ball?,cricket,cricket_description
+What team formation has eleven players in cricket rules?,cricket,cricket_definition
+What is the derivative of sin(x) with respect to x?,other,science_math
+Lecture 1: Introduction to Machine Learning and Neural Networks,other,tech_cs
+How many extra runs does a no-ball grant the batting side?,cricket,cricket_numeric
+Section 2.1: The gradient of the loss function with respect to weights is computed using chain rule.,other,tech_cs
+What governs the conditions under which an innings concludes?,cricket,cricket_rule
+Where does the wicketkeeper stand on the field?,cricket,cricket_position
+Explain the scoring system in badminton.,other,other_sports
+How do the underlying rules of Twenty20 relate to standard cricket concepts?,cricket,cricket_rule
+Under what condition is a boundary six scored?,cricket,cricket_condition
+In which country are the Great Pyramids of Giza located?,other,general_knowledge
+tennis wimbledon championship,other,other_sports
+"Astrophysics: Black Holes, Neutron Stars, and Gravitational Waves",other,science_math
+"What defines qualification criteria, points, and tie-break rules?",cricket,cricket_rule
+What are good destinations for a family vacation in summer?,other,conversational
+How does the TCP/IP protocol stack function?,other,tech_cs
+What are the best indoor house plants for beginners?,other,conversational
+Explain the separation of powers doctrine in constitutional law.,other,general_knowledge
+What flight path yields a boundary six?,cricket,cricket_condition
+What is the difference between SQL and NoSQL databases?,other,tech_cs
+How many innings does each team receive in a one-day international?,cricket,cricket_numeric
+What happens if a bowler breaks the stumps at the non-striker end before releasing the ball?,cricket,cricket_unanswerable
+Slide 8: Global Logistics - Supply Chain Optimization and Inventory Management,other,general_knowledge
+Which player scored the winning boundary in the 1999 World Cup semi-final?,cricket,cricket_unanswerable
+What term denotes runs that are not credited to an individual batter?,cricket,cricket_definition
+To which match official does the fielding side direct its appeal?,cricket,cricket_role
+What is inflation and how do central banks use interest rates to control it?,other,science_math
+Cybersecurity: Mitigating Cross-Site Scripting (XSS) and SQL Injection,other,tech_cs
+Where does each side have a predetermined overs limit?,cricket,cricket_rule
+What is a scrum in rugby union?,other,other_sports
+What is added to the team's score after batters cross successfully?,cricket,cricket_rule
+When does a run out take place?,cricket,cricket_condition
+What baseline extra does a wide provide?,cricket,cricket_numeric
+Which defensive players retrieve and throw the ball?,cricket,cricket_role
+What pitch location defines a yorker?,cricket,cricket_position
+Who adjudicates that a delivery is wide and awards the extra?,cricket,cricket_role
+What is the speed of light in a vacuum?,other,science_math
+Human Anatomy and Physiology: Cardiovascular and Respiratory Systems,other,science_math
+How many innings does each team bat in a Twenty20 contest?,cricket,cricket_numeric
+What is a hash table and how are collisions resolved?,other,tech_cs
+What dismissal is described when any fielder breaks the wicket while a batter is running?,cricket,cricket_definition
+Under what condition does a hit yield six boundary runs?,cricket,cricket_condition
+Which countries are permanent members of the United Nations Security Council?,other,general_knowledge
+Explain the concept of recursion with an example.,other,tech_cs
+Explain the penalty kick shootout rules in FIFA knockout matches.,other,other_sports
+How does DNS resolution translate domain names to IP addresses?,other,tech_cs
+Where does the batter stand when batting?,cricket,cricket_position
+"Besides scoring runs, what must a batter protect?",cricket,cricket_purpose
+How does scoring work in Formula 1 racing?,other,other_sports
+How many rounds are there in an Olympic boxing match?,other,other_sports
+"Along with protecting the wicket, what is the batter's goal?",cricket,cricket_purpose
+python tutorial,other,tech_cs
+From where is the bowler required to release the ball?,cricket,cricket_position
+"Slide 3: System Architecture - Microservices, Kafka Event Bus, and Redis Cache",other,tech_cs
+Explain the causes of the French Revolution in 1789.,other,general_knowledge
+How do transformers and self-attention mechanisms work in NLP?,other,tech_cs
+State Newton's three laws of motion.,other,science_math
+How does the Tour de France cycling classification and yellow jersey work?,other,other_sports
+When was the International Monetary Fund (IMF) established at Bretton Woods?,other,general_knowledge
+From what location does the bowler send the delivery?,cricket,cricket_position
+What dismissals is the wicketkeeper capable of performing?,cricket,cricket_rule
+Across which strip does the bowler deliver the ball to the batter?,cricket,cricket_position
+How are the various delivery types classified in terms of scoring?,cricket,cricket_rule
+What is the chemical formula for water?,other,science_math
+How do antibiotics kill bacteria without harming human cells?,other,science_math
+"Robotics and Automation: Forward and inverse kinematics, PID controllers, and path planning.",other,tech_cs
+Principles of Organic Chemistry: Hydrocarbons and Functional Groups,other,science_math
+Which fielder stands directly behind the wicket?,cricket,cricket_role
+What is an API and how does REST architecture work?,other,tech_cs
+"Database Management Systems: Relational algebra, tuple calculus, and SQL query optimization.",other,tech_cs
+"Guide to Personal Financial Planning: Savings, Investments, and Taxes",other,conversational
+chocolate cake recipe,other,conversational
+flight booking reservation,other,conversational
+What is a red card in soccer and what are the penalties?,other,other_sports
+machine learning algorithm,other,tech_cs
+What is the difference between fission and fusion nuclear reactions?,other,science_math
+"Besides defending the wicket, what does the batter use the bat to do?",cricket,cricket_purpose
+What does the 4 represent in a score of 150 for 4?,cricket,cricket_numeric
+What zone must the bowler release the delivery from?,cricket,cricket_position
+What is the typical bowling strike rate of an elite spin bowler?,cricket,cricket_unanswerable
+"Computer Networks: Congestion control in TCP, sliding window protocol, and routing algorithms.",other,tech_cs
+Who painted the Mona Lisa?,other,general_knowledge
+What condition must be met for a valid catch?,cricket,cricket_condition
+What is the quota of overs per team in a Twenty20 match?,cricket,cricket_rule
+What is Git rebase versus Git merge?,other,tech_cs
+Under what applicable guidelines may a substitute fielder enter?,cricket,cricket_rule
+What changes once an over of six balls is finished?,cricket,cricket_procedure
+What are the primary colors in the RGB color model?,other,general_knowledge
+Which batter is referred to as the striker?,cricket,cricket_definition
+How many competition points are awarded for winning a group match in the ICC ODI World Cup?,cricket,cricket_unanswerable
+Can an injured bowler's unfinished over be completed by another bowler?,cricket,cricket_unanswerable
+What match type allocates exactly 20 overs to each team?,cricket,cricket_definition
+Who invented Python?,other,tech_cs
+How do I book a train ticket online?,other,conversational
+Which fielder guards the off side area in front of square?,cricket,cricket_role
+What aspects of the competition does the tournament format determine?,cricket,cricket_rule
+What is Docker and containerization?,other,tech_cs
+What is photosynthesis and how do plants produce glucose?,other,science_math
+What basic concepts does the Twenty20 short format share with longer formats?,cricket,cricket_list
+"Linear Algebra: Eigenvalues, Eigenvectors, and Matrix Diagonalization",other,science_math
+Distributed Systems: Consensus Algorithms and Paxos Protocols,other,tech_cs
+What distinguishes a stumping from a run out regarding the batter's intent?,cricket,cricket_condition
+What knockout fixture determines which team advances as a finalist?,cricket,cricket_definition
+How many holes are played in a standard round of golf?,other,other_sports
+Where does the non-striker stand?,cricket,cricket_position
+Which dismissal immediately follows bowled in the list?,cricket,cricket_rule
+Who faces the bowler's delivery?,cricket,cricket_role
+How is an all-rounder characterized in cricket?,cricket,cricket_definition
+When does an umpire signal a no-ball against the bowler?,cricket,cricket_condition
+How is a bouncer described in cricket?,cricket,cricket_definition
+What must an over contain to be finished?,cricket,cricket_numeric
+What must happen in terms of deliveries when an infraction occurs?,cricket,cricket_procedure
+How is ice resurfaced using a Zamboni machine in hockey arenas?,other,other_sports
+"Introduction to Quantum Computing: Qubits, superposition, entanglement, and quantum gates.",other,tech_cs
+Slide 5: Clinical Trial Results - Efficacy and Safety Profile of Compound X,other,science_math
+What is the shot clock duration in college basketball?,other,other_sports
+Which player secures a catch to dismiss the batter?,cricket,cricket_role
+What label is given to the 20-over match structure?,cricket,cricket_definition
+What is the headcount of players on a cricket team?,cricket,cricket_numeric
+What is the longest river in the African continent?,other,general_knowledge
+Which country has the highest population in the world?,other,general_knowledge
+Who wrote the play Romeo and Juliet?,other,general_knowledge
+How is a fast delivery characterized?,cricket,cricket_description
+To what official rules must a ball conform to be considered legal?,cricket,cricket_rule
+Who does not receive credit for extra runs?,cricket,cricket_role
+What is the difference between AC and DC electrical current?,other,science_math
+Which runs get appended to the team total?,cricket,cricket_rule
+Can you recommend some good mystery novels to read?,other,conversational
+Which defensive participant can effect a run out?,cricket,cricket_role
+How many fielders are permitted outside the 30-yard circle in powerplay overs?,cricket,cricket_unanswerable
+How is an over formally defined in bowling?,cricket,cricket_definition
+What is the purpose of the Ozone layer in Earth's stratosphere?,other,general_knowledge
+How does the immune system produce antibodies in response to pathogens?,other,science_math
+How can I improve my daily productivity and time management?,other,conversational
+What is the weight limit for heavyweight division in professional mixed martial arts?,other,other_sports
+What is the required number of legal deliveries in a completed over?,cricket,cricket_numeric
+"Slide 9: Renewable Energy Transition - Wind, Solar, and Battery Storage Integration",other,science_math
+What is the standard number of innings allocated per team in Test cricket?,cricket,cricket_numeric
+What must the fielder demonstrate over the ball for a catch?,cricket,cricket_condition
+What kind of balls must a bowler deliver as part of their duty?,cricket,cricket_rule
+What is the minimum number of overs that must be bowled each day in a Test?,cricket,cricket_unanswerable
+Which team won the 2022 ICC Men's T20 World Cup?,cricket,cricket_unanswerable
+Within what match period can a bowler not bowl consecutive overs?,cricket,cricket_rule
+What is the difference between civil law and common law legal systems?,other,general_knowledge
+What happens to the team that attains the higher score after both innings?,cricket,cricket_rule
+Can a batter change their batting stance from right to left handed while the bowler runs up?,cricket,cricket_unanswerable
+What is the purpose of the International Court of Justice in The Hague?,other,general_knowledge
+What control must be achieved before the ball touches the ground?,cricket,cricket_condition
+What is the second law of thermodynamics and what is entropy?,other,science_math
+How is the restriction on a substitute adopting batting or bowling stated?,cricket,cricket_rule
+president of the country,other,general_knowledge
+Abstract: This paper presents a convolutional neural network for image recognition.,other,tech_cs
+What is the law of conservation of energy?,other,science_math
+bowler bowling average and economy rate,cricket,cricket_short
+What occurs to end the innings when all permitted overs have been bowled?,cricket,cricket_condition
+What is the maximum number of overs one bowler can bowl in a 50-over ODI?,cricket,cricket_unanswerable
+What is the role of the quarterback in American football offense?,other,other_sports
+What mathematical formula is used to calculate net run rate on a tournament points table?,cricket,cricket_unanswerable
+How many valid balls must one bowler complete during an over?,cricket,cricket_numeric
+super over tie-breaker rules in T20,cricket,cricket_short
+What was the official attendance figure for the 2023 Cricket World Cup final in Ahmedabad?,cricket,cricket_unanswerable
+In what timeframe does the ban on bowling two consecutive overs apply?,cricket,cricket_rule
+Toward whom does the bowler bowl the ball?,cricket,cricket_role
+International Economics: Balance of Payments and Foreign Exchange Reserves,other,general_knowledge
+Under what regulations can an alternative match result occur in an ODI?,cricket,cricket_rule
+What is herd immunity and how do vaccines contribute to community protection?,other,science_math
+What causes solar and lunar eclipses?,other,science_math
+What are the rules of offsides in ice hockey?,other,other_sports
+"Olympic Swimming: Rules for Freestyle, Backstroke, and Butterfly",other,other_sports
+Which dismissal involves a batter breaking their own wicket during the delivery?,cricket,cricket_rule
+Which fixture determines the overall champion of the tournament?,cricket,cricket_definition
+Software Architecture: Microservices vs Monolithic Architecture,other,tech_cs
+When was the European Union formed?,other,general_knowledge
+What is the standard number of extras awarded for a single wide?,cricket,cricket_numeric
+Who seeks to prevent runs and dismiss batters?,cricket,cricket_role
+Which dismissal method is executed by the wicketkeeper breaking the stumps?,cricket,cricket_rule
+What regulations govern the use of a substitute fielder?,cricket,cricket_rule
+What is plate tectonics and how do earthquakes occur?,other,science_math
+"Explain the structure of an atom: protons, neutrons, and electrons.",other,science_math
+Do both no-balls and wides award an extra to the batting team?,cricket,cricket_rule
+Slide 10: Conclusion and Next Steps for Enterprise Software Rollout,other,tech_cs
+Subject to what rules does an innings conclude?,cricket,cricket_rule
+Slide 2: Market Analysis - Competitive Landscape and Target Demographics,other,general_knowledge
+How many valid balls must be bowled before an over can end?,cricket,cricket_numeric
+capital city geography,other,general_knowledge
+"Blockchain and Cryptography: Proof of Work, distributed consensus, and smart contract execution.",other,tech_cs
+What kind of run is a bye or leg bye classified as?,cricket,cricket_definition
+What implement does the batter employ to score runs or defend?,cricket,cricket_rule
+What is the largest ocean on Earth?,other,general_knowledge
+"Operating Systems: Virtual Memory, Paging, and Page Faults",other,tech_cs
+"Digital Signal Processing: Discrete Fourier Transform (DFT), Fast Fourier Transform (FFT), and filtering.",other,tech_cs
+Computer Vision: Object Detection using YOLO and R-CNN,other,tech_cs
+Can the same bowler bowl back-to-back overs in the same innings?,cricket,cricket_rule
+How long is each quarter in a professional basketball match?,other,other_sports
+What is the maximum legal width of a cricket bat blade in inches?,cricket,cricket_unanswerable
+What competition system immediately eliminates a side upon a match defeat?,cricket,cricket_definition
+Which participant is responsible for bowling from one end?,cricket,cricket_role
+How is a no-ball classified in cricket?,cricket,cricket_definition
+What is a semi-final in a tournament?,cricket,cricket_definition
+What is the distance of a marathon race?,other,other_sports
+Which team has two batters on the field at a time?,cricket,cricket_role
+What is the best recipe for baking chocolate chip cookies?,other,conversational
+How many points for a try in rugby?,other,other_sports
+Along what playing surface does the bowler deliver the ball?,cricket,cricket_position
+"Which result is listed alongside a win, loss, and draw?",cricket,cricket_rule
+What specific example of a delivery restriction breach is cited?,cricket,cricket_rule
+What procedures are defined by competition rules to resolve ties?,cricket,cricket_rule
+How does Doppler effect explain changes in wave frequency from moving sources?,other,science_math
+What is the fielding team's wicket-taking objective?,cricket,cricket_purpose
+"Compiler Design: Lexical Analysis, Parsing, and AST Generation",other,tech_cs
+What score is awarded for clearing the boundary on the fly?,cricket,cricket_numeric
+What dismissal happens when a batter out of their ground has their wicket broken during a run?,cricket,cricket_definition
+Which player changes after a completed run?,cricket,cricket_role
+Under what match outcome is a clear win not recorded in an ODI?,cricket,cricket_condition
+What number of players are in a cricket team according to the rules?,cricket,cricket_numeric
+How do I fix a leaking bathroom faucet?,other,conversational
+Who does the non-batting team place around the ground?,cricket,cricket_role
+Can you write a poem about the monsoon season?,other,conversational
+What piece of equipment does the batter use to hit the ball?,cricket,cricket_rule
+Can a leg bye be scored if the batter padded the ball away without playing a stroke?,cricket,cricket_unanswerable
+Where are completed runs credited?,cricket,cricket_rule
+Where does the new bowler bowl from after an over completes?,cricket,cricket_position
+What match types may be utilized in a cricket tournament?,cricket,cricket_list
+"Cloud Computing: AWS EC2, S3, and Serverless Lambda Functions",other,tech_cs
+How is a wide delivery defined?,cricket,cricket_definition
+What effect does a no-ball have on the over progression?,cricket,cricket_rule
+What dismissal occurs when a batter breaks their own wicket with bat or person?,cricket,cricket_rule
+Where does a yorker pitch relative to the batter?,cricket,cricket_position
+Does a wide count toward the six balls needed in an over?,cricket,cricket_rule
+How to write a professional resume for a job application?,other,conversational
+What score is achieved when the ball touches the turf before the boundary?,cricket,cricket_rule
+What exception prevents the team with the higher score from simply winning an ODI?,cricket,cricket_condition
+"In the example notation 150 for 4, what does 150 mean?",cricket,cricket_numeric
+How many extras are granted to the batting side for a wide?,cricket,cricket_numeric
+Who was the first president of the United States?,other,general_knowledge
+What dual function defines a batter's primary objective?,cricket,cricket_role
+Explain convolutional neural networks for image classification.,other,tech_cs
+What is the central dogma of molecular biology: transcription and translation?,other,science_math
+"How are points scored in fencing: foil, epee, and sabre?",other,other_sports
+Can an injured batter utilize a runner under modern playing conditions?,cricket,cricket_unanswerable
+Modern Political Systems: Parliamentary Democracy vs Presidential Republic,other,general_knowledge
+"Slide 6: Project Timeline - Milestones, Deliverables, and Resource Allocation",other,conversational
+What is an innings defined as in cricket?,cricket,cricket_definition
+What are the rules for serving in competitive table tennis?,other,other_sports
+What is the batter unable to hit the ball with when a wide is delivered?,cricket,cricket_description
+How many overs are scheduled to be bowled in one day of a Test match?,cricket,cricket_unanswerable
+How many legal deliveries make up an over?,cricket,cricket_numeric
+What is the strike zone in baseball and how is a home run scored?,other,other_sports
+Which type of player performs major duties in both batting and bowling?,cricket,cricket_role
+Which dismissal heads the list of ways a batter can be out?,cricket,cricket_rule
+Who won the FIFA World Cup in 2022?,other,other_sports
+Slide 1: Executive Summary - Q3 Financial Performance and Revenue Growth,other,general_knowledge
+Where must the batter be positioned for a run out to occur?,cricket,cricket_position
+Explain binary search algorithm and its time complexity.,other,tech_cs
+How to take high quality portrait photographs with a smartphone,other,conversational
+What is the difference between GDP and GNP economic measures?,other,general_knowledge
+Who was the first human to land on the moon?,other,general_knowledge
+How many minutes must elapse before an incoming batter can be timed out?,cricket,cricket_unanswerable
+"What is the difference between freestyle, breaststroke, and butterfly in swimming?",other,other_sports
+Under what specific condition is a boundary four awarded?,cricket,cricket_condition
+Track and Field Championship: Pole Vault and Decathlon Scoring,other,other_sports
+What does 'love' mean in tennis scoring?,other,other_sports
+Chapter 3: Relational Database Schema Design and Normalization,other,tech_cs
+What is the boiling point of water at sea level?,other,science_math
+Which batter is stationed away from the delivery end?,cricket,cricket_role
+What was the significance of the Magna Carta signed in 1215?,other,general_knowledge

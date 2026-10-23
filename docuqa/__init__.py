@@ -1,6 +1,19 @@
 """DocuQA ingestion, retrieval, QA, and evaluation public API."""
 from .application import CorpusIndex, TimedCorpusIndex, ask_indexed_corpus, build_corpus_index, build_timed_corpus_index
 from .bm25 import BM25Retriever
+from .classifier import (
+    DEFAULT_CLASSIFIER_PATH,
+    DomainClassificationResult,
+    DomainClassifier,
+    OUT_OF_DOMAIN_REJECTION_MESSAGE,
+    UNSUPPORTED_DOCUMENT_MESSAGE,
+)
+from .question_detector import (
+    DetectedQuestion,
+    classify_question_type,
+    detect_document_questions,
+    detect_questions_in_chunk,
+)
 from .evaluation import (
     BenchmarkRow, EvaluationCase, PublicEvaluationCase, QuestionMetrics,
     aggregate_metrics, aggregate_public, average_precision, evaluate_public_case,
@@ -20,6 +33,8 @@ from .retrieval import SearchResult, TfidfRetriever
 
 __all__ = [
     "BM25Retriever", "BenchmarkRow", "Chunk", "ChunkExperimentConfig", "ChunkExperimentResult", "CorpusIndex", "DEFAULT_QA_MODEL", "Document",
+    "DomainClassificationResult", "DomainClassifier", "DEFAULT_CLASSIFIER_PATH", "OUT_OF_DOMAIN_REJECTION_MESSAGE", "UNSUPPORTED_DOCUMENT_MESSAGE",
+    "DetectedQuestion", "classify_question_type", "detect_document_questions", "detect_questions_in_chunk",
     "EvaluationCase", "INSUFFICIENT_EVIDENCE", "LocalExtractiveQAModel", "PublicEvaluationCase",
     "IngestionTiming", "QAResponse", "QuestionMetrics", "SearchResult", "TimedCorpusIndex", "TfidfRetriever", "aggregate_metrics",
     "aggregate_public", "ask_indexed_corpus", "average_precision", "build_corpus_index", "clean_text",
