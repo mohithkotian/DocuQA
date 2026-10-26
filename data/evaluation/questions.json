@@ -1,0 +1,841 @@
+{
+  "dataset_name": "docuqa_cricket_benchmark",
+  "dataset_version": "1.0",
+  "questions": [
+    {
+      "qid": "q01",
+      "question": "How many legal deliveries are in an over?",
+      "expected_answer": "six legal deliveries",
+      "relevant_source": [
+        "01_laws_and_rules.md"
+      ],
+      "answerable": true,
+      "categories": [
+        "answerable",
+        "numeric",
+        "rule-specific"
+      ]
+    },
+    {
+      "qid": "q02",
+      "question": "What constitutes a legal delivery under cricket laws?",
+      "expected_answer": "a ball that conforms to the laws of cricket",
+      "relevant_source": [
+        "01_laws_and_rules.md"
+      ],
+      "answerable": true,
+      "categories": [
+        "answerable",
+        "definition",
+        "rule-specific"
+      ]
+    },
+    {
+      "qid": "q03",
+      "question": "What is a no-ball in cricket?",
+      "expected_answer": "an illegal delivery",
+      "relevant_source": [
+        "01_laws_and_rules.md"
+      ],
+      "answerable": true,
+      "categories": [
+        "answerable",
+        "definition",
+        "rule-specific"
+      ]
+    },
+    {
+      "qid": "q04",
+      "question": "What extra is awarded when a bowler bowls a no-ball?",
+      "expected_answer": "one no-ball extra",
+      "relevant_source": [
+        "01_laws_and_rules.md"
+      ],
+      "answerable": true,
+      "categories": [
+        "answerable",
+        "numeric",
+        "rule-specific"
+      ]
+    },
+    {
+      "qid": "q05",
+      "question": "What constitutes a wide delivery?",
+      "expected_answer": "a delivery that passes too far from the batter to be hit with a normal cricket stroke",
+      "relevant_source": [
+        "01_laws_and_rules.md"
+      ],
+      "answerable": true,
+      "categories": [
+        "answerable",
+        "definition",
+        "rule-specific"
+      ]
+    },
+    {
+      "qid": "q06",
+      "question": "What does the umpire award to the batting side when a wide is called?",
+      "expected_answer": "one wide extra",
+      "relevant_source": [
+        "01_laws_and_rules.md"
+      ],
+      "answerable": true,
+      "categories": [
+        "answerable",
+        "numeric",
+        "rule-specific"
+      ]
+    },
+    {
+      "qid": "q07",
+      "question": "What are the ways a batter can be dismissed?",
+      "expected_answer": "bowled, caught, leg before wicket, run out, stumped, hit wicket, and obstructing the field",
+      "relevant_source": [
+        "01_laws_and_rules.md"
+      ],
+      "answerable": true,
+      "categories": [
+        "answerable",
+        "rule-specific"
+      ]
+    },
+    {
+      "qid": "q08",
+      "question": "Where does a batter stand when batting?",
+      "expected_answer": "in front of the wicket",
+      "relevant_source": [
+        "02_batting.md"
+      ],
+      "answerable": true,
+      "categories": [
+        "answerable",
+        "rule-specific"
+      ]
+    },
+    {
+      "qid": "q09",
+      "question": "What is the objective of a defensive stroke in batting?",
+      "expected_answer": "to protect the wicket",
+      "relevant_source": [
+        "02_batting.md"
+      ],
+      "answerable": true,
+      "categories": [
+        "answerable",
+        "definition"
+      ]
+    },
+    {
+      "qid": "q10",
+      "question": "What is the purpose of an attacking stroke?",
+      "expected_answer": "to hit the ball into space",
+      "relevant_source": [
+        "02_batting.md"
+      ],
+      "answerable": true,
+      "categories": [
+        "answerable",
+        "paraphrased"
+      ]
+    },
+    {
+      "qid": "q11",
+      "question": "How many runs are scored when a ball clears the boundary without bouncing?",
+      "expected_answer": "six runs",
+      "relevant_source": [
+        "02_batting.md"
+      ],
+      "answerable": true,
+      "categories": [
+        "answerable",
+        "numeric",
+        "rule-specific"
+      ]
+    },
+    {
+      "qid": "q12",
+      "question": "How many runs are scored when the ball reaches the boundary after touching the ground?",
+      "expected_answer": "four runs",
+      "relevant_source": [
+        "02_batting.md"
+      ],
+      "answerable": true,
+      "categories": [
+        "answerable",
+        "numeric",
+        "rule-specific"
+      ]
+    },
+    {
+      "qid": "q13",
+      "question": "How do batters score runs by running?",
+      "expected_answer": "running between the popping creases",
+      "relevant_source": [
+        "02_batting.md"
+      ],
+      "answerable": true,
+      "categories": [
+        "answerable",
+        "rule-specific"
+      ]
+    },
+    {
+      "qid": "q14",
+      "question": "What is a bye in cricket scoring?",
+      "expected_answer": "runs scored without the ball touching the bat",
+      "relevant_source": [
+        "02_batting.md"
+      ],
+      "answerable": true,
+      "categories": [
+        "answerable",
+        "rule-specific"
+      ]
+    },
+    {
+      "qid": "q15",
+      "question": "What is the primary role of a bowler?",
+      "expected_answer": "to dismiss batters and restrict runs",
+      "relevant_source": [
+        "03_bowling.md"
+      ],
+      "answerable": true,
+      "categories": [
+        "answerable",
+        "rule-specific"
+      ]
+    },
+    {
+      "qid": "q16",
+      "question": "What technique does a fast bowler use?",
+      "expected_answer": "high speed to beat the batter",
+      "relevant_source": [
+        "03_bowling.md"
+      ],
+      "answerable": true,
+      "categories": [
+        "answerable",
+        "paraphrased"
+      ]
+    },
+    {
+      "qid": "q17",
+      "question": "What technique does a spin bowler use?",
+      "expected_answer": "rotates the ball to make it deviate off the pitch",
+      "relevant_source": [
+        "03_bowling.md"
+      ],
+      "answerable": true,
+      "categories": [
+        "answerable",
+        "difficult"
+      ]
+    },
+    {
+      "qid": "q18",
+      "question": "From where does a bowler deliver the ball?",
+      "expected_answer": "behind the bowling crease",
+      "relevant_source": [
+        "03_bowling.md"
+      ],
+      "answerable": true,
+      "categories": [
+        "answerable",
+        "rule-specific"
+      ]
+    },
+    {
+      "qid": "q19",
+      "question": "What is a maiden over?",
+      "expected_answer": "an over in which no runs are scored",
+      "relevant_source": [
+        "03_bowling.md"
+      ],
+      "answerable": true,
+      "categories": [
+        "answerable",
+        "definition",
+        "rule-specific"
+      ]
+    },
+    {
+      "qid": "q20",
+      "question": "What restriction is placed on consecutive overs by a single bowler?",
+      "expected_answer": "a bowler cannot bowl two consecutive overs",
+      "relevant_source": [
+        "03_bowling.md"
+      ],
+      "answerable": true,
+      "categories": [
+        "answerable",
+        "rule-specific"
+      ]
+    },
+    {
+      "qid": "q21",
+      "question": "What is swing bowling?",
+      "expected_answer": "moving the ball in the air",
+      "relevant_source": [
+        "03_bowling.md"
+      ],
+      "answerable": true,
+      "categories": [
+        "answerable",
+        "difficult"
+      ]
+    },
+    {
+      "qid": "q22",
+      "question": "How many fielders are on the field for the bowling side?",
+      "expected_answer": "eleven fielders",
+      "relevant_source": [
+        "04_fielding.md"
+      ],
+      "answerable": true,
+      "categories": [
+        "answerable",
+        "numeric",
+        "rule-specific"
+      ]
+    },
+    {
+      "qid": "q23",
+      "question": "Where does the wicketkeeper stand?",
+      "expected_answer": "behind the wicket at the striker end",
+      "relevant_source": [
+        "04_fielding.md"
+      ],
+      "answerable": true,
+      "categories": [
+        "answerable",
+        "rule-specific"
+      ]
+    },
+    {
+      "qid": "q24",
+      "question": "What special equipment is the wicketkeeper allowed to wear?",
+      "expected_answer": "gloves and external leg guards",
+      "relevant_source": [
+        "04_fielding.md"
+      ],
+      "answerable": true,
+      "categories": [
+        "answerable",
+        "rule-specific"
+      ]
+    },
+    {
+      "qid": "q25",
+      "question": "What are the close-catching positions in fielding?",
+      "expected_answer": "slips, gully, and short leg",
+      "relevant_source": [
+        "04_fielding.md"
+      ],
+      "answerable": true,
+      "categories": [
+        "answerable",
+        "paraphrased"
+      ]
+    },
+    {
+      "qid": "q26",
+      "question": "What is the purpose of outfielders?",
+      "expected_answer": "to prevent boundaries and catch high hits",
+      "relevant_source": [
+        "04_fielding.md"
+      ],
+      "answerable": true,
+      "categories": [
+        "answerable",
+        "definition"
+      ]
+    },
+    {
+      "qid": "q27",
+      "question": "What dismissal can fielders execute by throwing the ball at the stumps?",
+      "expected_answer": "run out",
+      "relevant_source": [
+        "04_fielding.md"
+      ],
+      "answerable": true,
+      "categories": [
+        "answerable",
+        "rule-specific"
+      ]
+    },
+    {
+      "qid": "q28",
+      "question": "Can fielders other than the wicketkeeper wear gloves?",
+      "expected_answer": "no",
+      "relevant_source": [
+        "04_fielding.md"
+      ],
+      "answerable": true,
+      "categories": [
+        "answerable",
+        "rule-specific"
+      ]
+    },
+    {
+      "qid": "q29",
+      "question": "What extras can be added to a team score?",
+      "expected_answer": "byes, leg-byes, wides, and no-balls",
+      "relevant_source": [
+        "05_scoring.md"
+      ],
+      "answerable": true,
+      "categories": [
+        "answerable",
+        "rule-specific"
+      ]
+    },
+    {
+      "qid": "q30",
+      "question": "What is a leg-bye?",
+      "expected_answer": "runs scored off the batter body without touching the bat",
+      "relevant_source": [
+        "05_scoring.md"
+      ],
+      "answerable": true,
+      "categories": [
+        "answerable",
+        "definition"
+      ]
+    },
+    {
+      "qid": "q31",
+      "question": "What is a century in cricket?",
+      "expected_answer": "a score of one hundred runs or more by a single batter",
+      "relevant_source": [
+        "05_scoring.md"
+      ],
+      "answerable": true,
+      "categories": [
+        "answerable",
+        "numeric",
+        "definition"
+      ]
+    },
+    {
+      "qid": "q32",
+      "question": "What is a half-century?",
+      "expected_answer": "a score of fifty runs or more",
+      "relevant_source": [
+        "05_scoring.md"
+      ],
+      "answerable": true,
+      "categories": [
+        "answerable",
+        "numeric",
+        "definition"
+      ]
+    },
+    {
+      "qid": "q33",
+      "question": "What determines the winning team in a match?",
+      "expected_answer": "the team with the higher number of runs",
+      "relevant_source": [
+        "05_scoring.md"
+      ],
+      "answerable": true,
+      "categories": [
+        "answerable",
+        "rule-specific"
+      ]
+    },
+    {
+      "qid": "q34",
+      "question": "What is the offside rule in football?",
+      "expected_answer": "INSUFFICIENT_EVIDENCE",
+      "relevant_source": [],
+      "answerable": false,
+      "categories": [
+        "unanswerable",
+        "rule-specific"
+      ]
+    },
+    {
+      "qid": "q35",
+      "question": "What happens if both teams score the same number of runs in a limited-overs match?",
+      "expected_answer": "a tie or super over",
+      "relevant_source": [
+        "05_scoring.md"
+      ],
+      "answerable": true,
+      "categories": [
+        "answerable",
+        "difficult"
+      ]
+    },
+    {
+      "qid": "q36",
+      "question": "What is strike rate in cricket?",
+      "expected_answer": "runs scored per hundred balls faced",
+      "relevant_source": [
+        "05_scoring.md"
+      ],
+      "answerable": true,
+      "categories": [
+        "answerable",
+        "numeric",
+        "definition"
+      ]
+    },
+    {
+      "qid": "q37",
+      "question": "How many innings does each team play in a Test match?",
+      "expected_answer": "two innings",
+      "relevant_source": [
+        "06_match_structure.md"
+      ],
+      "answerable": true,
+      "categories": [
+        "answerable",
+        "numeric",
+        "rule-specific"
+      ]
+    },
+    {
+      "qid": "q38",
+      "question": "How many days can a Test match last?",
+      "expected_answer": "up to five days",
+      "relevant_source": [
+        "06_match_structure.md"
+      ],
+      "answerable": true,
+      "categories": [
+        "answerable",
+        "numeric",
+        "rule-specific"
+      ]
+    },
+    {
+      "qid": "q39",
+      "question": "How many overs are played in a One Day International match per team?",
+      "expected_answer": "fifty overs",
+      "relevant_source": [
+        "06_match_structure.md"
+      ],
+      "answerable": true,
+      "categories": [
+        "answerable",
+        "numeric",
+        "rule-specific"
+      ]
+    },
+    {
+      "qid": "q40",
+      "question": "How many overs are in a Twenty20 match per side?",
+      "expected_answer": "twenty overs",
+      "relevant_source": [
+        "06_match_structure.md"
+      ],
+      "answerable": true,
+      "categories": [
+        "answerable",
+        "numeric",
+        "rule-specific"
+      ]
+    },
+    {
+      "qid": "q41",
+      "question": "What is an interval between innings called?",
+      "expected_answer": "the innings break",
+      "relevant_source": [
+        "06_match_structure.md"
+      ],
+      "answerable": true,
+      "categories": [
+        "answerable",
+        "definition"
+      ]
+    },
+    {
+      "qid": "q42",
+      "question": "What is the follow-on in multi-day cricket?",
+      "expected_answer": "requiring the second batting side to bat again immediately",
+      "relevant_source": [
+        "06_match_structure.md"
+      ],
+      "answerable": true,
+      "categories": [
+        "answerable",
+        "difficult",
+        "rule-specific"
+      ]
+    },
+    {
+      "qid": "q43",
+      "question": "How many deliveries are bowled in a complete 50-over innings?",
+      "expected_answer": "three hundred legal deliveries",
+      "relevant_source": [
+        "06_match_structure.md"
+      ],
+      "answerable": true,
+      "categories": [
+        "answerable",
+        "numeric",
+        "rule-specific"
+      ]
+    },
+    {
+      "qid": "q44",
+      "question": "How many players are on each team in a standard cricket match?",
+      "expected_answer": "eleven players",
+      "relevant_source": [
+        "07_players_and_teams.md"
+      ],
+      "answerable": true,
+      "categories": [
+        "answerable",
+        "numeric",
+        "rule-specific"
+      ]
+    },
+    {
+      "qid": "q45",
+      "question": "What is the role of the captain in a cricket team?",
+      "expected_answer": "tactical leadership and declaring innings",
+      "relevant_source": [
+        "07_players_and_teams.md"
+      ],
+      "answerable": true,
+      "categories": [
+        "answerable",
+        "paraphrased"
+      ]
+    },
+    {
+      "qid": "q46",
+      "question": "What is an all-rounder?",
+      "expected_answer": "a player skilled in both batting and bowling",
+      "relevant_source": [
+        "07_players_and_teams.md"
+      ],
+      "answerable": true,
+      "categories": [
+        "answerable",
+        "definition"
+      ]
+    },
+    {
+      "qid": "q47",
+      "question": "What is a substitute fielder allowed to do?",
+      "expected_answer": "field but not bat, bowl, or keep wicket",
+      "relevant_source": [
+        "07_players_and_teams.md"
+      ],
+      "answerable": true,
+      "categories": [
+        "answerable",
+        "rule-specific"
+      ]
+    },
+    {
+      "qid": "q48",
+      "question": "Who acts as the official adjudicators on the field?",
+      "expected_answer": "two on-field umpires",
+      "relevant_source": [
+        "07_players_and_teams.md"
+      ],
+      "answerable": true,
+      "categories": [
+        "answerable",
+        "numeric",
+        "rule-specific"
+      ]
+    },
+    {
+      "qid": "q49",
+      "question": "What is the third umpire responsible for?",
+      "expected_answer": "video replays and boundary decisions",
+      "relevant_source": [
+        "07_players_and_teams.md"
+      ],
+      "answerable": true,
+      "categories": [
+        "answerable",
+        "paraphrased"
+      ]
+    },
+    {
+      "qid": "q50",
+      "question": "Which international body governs world cricket tournaments?",
+      "expected_answer": "International Cricket Council",
+      "relevant_source": [
+        "08_tournaments.md"
+      ],
+      "answerable": true,
+      "categories": [
+        "answerable",
+        "rule-specific"
+      ]
+    },
+    {
+      "qid": "q51",
+      "question": "What is the ICC Cricket World Cup format?",
+      "expected_answer": "fifty-over One Day International format",
+      "relevant_source": [
+        "08_tournaments.md"
+      ],
+      "answerable": true,
+      "categories": [
+        "answerable",
+        "rule-specific"
+      ]
+    },
+    {
+      "qid": "q52",
+      "question": "How often is the Men Cricket World Cup traditionally held?",
+      "expected_answer": "every four years",
+      "relevant_source": [
+        "08_tournaments.md"
+      ],
+      "answerable": true,
+      "categories": [
+        "answerable",
+        "numeric",
+        "rule-specific"
+      ]
+    },
+    {
+      "qid": "q53",
+      "question": "What is the ICC T20 World Cup?",
+      "expected_answer": "the international championship of Twenty20 cricket",
+      "relevant_source": [
+        "08_tournaments.md"
+      ],
+      "answerable": true,
+      "categories": [
+        "answerable",
+        "definition"
+      ]
+    },
+    {
+      "qid": "q54",
+      "question": "What is the World Test Championship?",
+      "expected_answer": "a league competition for Test playing nations",
+      "relevant_source": [
+        "08_tournaments.md"
+      ],
+      "answerable": true,
+      "categories": [
+        "answerable",
+        "paraphrased"
+      ]
+    },
+    {
+      "qid": "q55",
+      "question": "What is the oldest international cricket rivalry trophy?",
+      "expected_answer": "The Ashes",
+      "relevant_source": [
+        "08_tournaments.md"
+      ],
+      "answerable": true,
+      "categories": [
+        "answerable",
+        "difficult"
+      ]
+    },
+    {
+      "qid": "q56",
+      "question": "How many points are scored for a touchdown in rugby?",
+      "expected_answer": "INSUFFICIENT_EVIDENCE",
+      "relevant_source": [],
+      "answerable": false,
+      "categories": [
+        "unanswerable",
+        "numeric"
+      ]
+    },
+    {
+      "qid": "q57",
+      "question": "Who won the 2026 soccer World Cup?",
+      "expected_answer": "INSUFFICIENT_EVIDENCE",
+      "relevant_source": [],
+      "answerable": false,
+      "categories": [
+        "unanswerable",
+        "paraphrased"
+      ]
+    },
+    {
+      "qid": "q58",
+      "question": "What is the chemical formula for photosynthesis?",
+      "expected_answer": "INSUFFICIENT_EVIDENCE",
+      "relevant_source": [],
+      "answerable": false,
+      "categories": [
+        "unanswerable",
+        "difficult"
+      ]
+    },
+    {
+      "qid": "q59",
+      "question": "How does quantum entanglement function in physics?",
+      "expected_answer": "INSUFFICIENT_EVIDENCE",
+      "relevant_source": [],
+      "answerable": false,
+      "categories": [
+        "unanswerable",
+        "difficult"
+      ]
+    },
+    {
+      "qid": "q60",
+      "question": "What is the capital city of Australia?",
+      "expected_answer": "INSUFFICIENT_EVIDENCE",
+      "relevant_source": [],
+      "answerable": false,
+      "categories": [
+        "unanswerable",
+        "rule-specific"
+      ]
+    },
+    {
+      "qid": "q61",
+      "question": "What is the maximum speed limit on German autobahns?",
+      "expected_answer": "INSUFFICIENT_EVIDENCE",
+      "relevant_source": [],
+      "answerable": false,
+      "categories": [
+        "unanswerable",
+        "numeric"
+      ]
+    },
+    {
+      "qid": "q62",
+      "question": "How many strings are on a standard acoustic guitar?",
+      "expected_answer": "INSUFFICIENT_EVIDENCE",
+      "relevant_source": [],
+      "answerable": false,
+      "categories": [
+        "unanswerable",
+        "numeric"
+      ]
+    },
+    {
+      "qid": "q63",
+      "question": "Who painted the Mona Lisa?",
+      "expected_answer": "INSUFFICIENT_EVIDENCE",
+      "relevant_source": [],
+      "answerable": false,
+      "categories": [
+        "unanswerable",
+        "paraphrased"
+      ]
+    },
+    {
+      "qid": "q64",
+      "question": "What is the boiling point of liquid nitrogen?",
+      "expected_answer": "INSUFFICIENT_EVIDENCE",
+      "relevant_source": [],
+      "answerable": false,
+      "categories": [
+        "unanswerable",
+        "numeric",
+        "difficult"
+      ]
+    }
+  ]
+}

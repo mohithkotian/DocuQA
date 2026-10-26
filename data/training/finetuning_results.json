@@ -1,7 +1,7 @@
 {
   "base_model": "deepset/minilm-uncased-squad2",
-  "fine_tuned_model": "models\\docuqa-minilm-cricket",
-  "training_dataset": "data\\training\\cricket_qa_train.json",
+  "fine_tuned_model": "models/docuqa-minilm-cricket",
+  "training_dataset": "data/training/cricket_qa_train.json",
   "seed": 42,
   "epochs": 2,
   "learning_rate": 3e-05,
@@ -41,14 +41,14 @@
       "dropped_examples": 0
     },
     "train_loss_history": [
-      1.0187820394887872,
-      0.540937342154591
+      1.0187821008750926,
+      0.5409372098743915
     ],
     "val_loss_history": [
-      0.7887219876050949,
-      0.7560221369067828
+      0.7887225866317749,
+      0.7560229395826658
     ],
-    "total_training_time_seconds": 1578.520985841751
+    "total_training_time_seconds": 260.0875289440155
   },
   "internal_test_metrics": {
     "exact_match": 0.6666666666666666,
@@ -56,79 +56,79 @@
   },
   "baseline_metrics": {
     "TF-IDF": {
-      "exact_match": 0.484375,
-      "token_f1": 0.7397185780711806,
-      "answerable_accuracy": 0.4074074074074074,
-      "answerable_success": 0.8148148148148148,
+      "exact_match": 0.09375,
+      "token_f1": 0.24763287927350427,
+      "answerable_accuracy": 0.1111111111111111,
+      "answerable_success": 0.25925925925925924,
       "abstention_accuracy": 0.9,
-      "overall_abstention_correct": 0.921875,
-      "source_accuracy": 0.8703703703703703,
+      "overall_abstention_correct": 0.796875,
+      "source_accuracy": 0.5370370370370371,
       "evidence_validity": 1.0
     },
     "BM25": {
-      "exact_match": 0.484375,
-      "token_f1": 0.7397185780711806,
-      "answerable_accuracy": 0.42592592592592593,
-      "answerable_success": 0.8333333333333334,
-      "abstention_accuracy": 0.8,
-      "overall_abstention_correct": 0.921875,
-      "source_accuracy": 0.8888888888888888,
+      "exact_match": 0.09375,
+      "token_f1": 0.24329260149572648,
+      "answerable_accuracy": 0.1111111111111111,
+      "answerable_success": 0.25925925925925924,
+      "abstention_accuracy": 0.9,
+      "overall_abstention_correct": 0.75,
+      "source_accuracy": 0.46296296296296297,
       "evidence_validity": 1.0
     }
   },
   "finetuned_metrics": {
     "TF-IDF": {
-      "exact_match": 0.640625,
-      "token_f1": 0.8368582965828032,
-      "answerable_accuracy": 0.5740740740740741,
-      "answerable_success": 0.7407407407407407,
+      "exact_match": 0.21875,
+      "token_f1": 0.2832829496891997,
+      "answerable_accuracy": 0.25925925925925924,
+      "answerable_success": 0.25925925925925924,
       "abstention_accuracy": 1.0,
-      "overall_abstention_correct": 0.984375,
-      "source_accuracy": 0.8888888888888888,
+      "overall_abstention_correct": 0.765625,
+      "source_accuracy": 0.5,
       "evidence_validity": 1.0
     },
     "BM25": {
-      "exact_match": 0.671875,
-      "token_f1": 0.8649832965828032,
-      "answerable_accuracy": 0.6111111111111112,
-      "answerable_success": 0.7777777777777778,
+      "exact_match": 0.21875,
+      "token_f1": 0.28883850524475524,
+      "answerable_accuracy": 0.25925925925925924,
+      "answerable_success": 0.25925925925925924,
       "abstention_accuracy": 1.0,
-      "overall_abstention_correct": 0.984375,
-      "source_accuracy": 0.9259259259259259,
+      "overall_abstention_correct": 0.78125,
+      "source_accuracy": 0.5,
       "evidence_validity": 1.0
     }
   },
   "improvement": {
     "TF-IDF": {
-      "exact_match": 0.15625,
-      "token_f1": 0.09713971851162262,
-      "answerable_accuracy": 0.16666666666666669,
-      "answerable_success": -0.07407407407407407,
+      "exact_match": 0.125,
+      "token_f1": 0.03565007041569543,
+      "answerable_accuracy": 0.14814814814814814,
+      "answerable_success": 0.0,
       "abstention_accuracy": 0.09999999999999998,
-      "overall_abstention_correct": 0.0625,
-      "source_accuracy": 0.01851851851851849,
+      "overall_abstention_correct": -0.03125,
+      "source_accuracy": -0.03703703703703709,
       "evidence_validity": 0.0
     },
     "BM25": {
-      "exact_match": 0.1875,
-      "token_f1": 0.12526471851162257,
-      "answerable_accuracy": 0.18518518518518523,
-      "answerable_success": -0.05555555555555558,
-      "abstention_accuracy": 0.19999999999999996,
-      "overall_abstention_correct": 0.0625,
-      "source_accuracy": 0.03703703703703709,
+      "exact_match": 0.125,
+      "token_f1": 0.045545903749028754,
+      "answerable_accuracy": 0.14814814814814814,
+      "answerable_success": 0.0,
+      "abstention_accuracy": 0.09999999999999998,
+      "overall_abstention_correct": 0.03125,
+      "source_accuracy": 0.037037037037037035,
       "evidence_validity": 0.0
     }
   },
   "overfitting": false,
   "reproducibility": {
-    "python_version": "3.14.3 (tags/v3.14.3:323c59a, Feb  3 2026, 16:04:56) [MSC v.1944 64 bit (AMD64)]",
+    "python_version": "3.14.4 (v3.14.4:23116f998f6, Apr  7 2026, 09:45:22) [Clang 17.0.0 (clang-1700.6.4.2)]",
     "transformers_version": "4.57.6",
-    "torch_version": "2.14.1+cpu",
+    "torch_version": "2.14.1",
     "device": "cpu",
-    "cpu_architecture": "Intel64 Family 6 Model 154 Stepping 4, GenuineIntel",
+    "cpu_architecture": "arm",
     "max_sequence_length": 384,
     "document_stride": 128,
-    "benchmark_sha256": "A0C5E7C0645D0D5CAEF2636CA036D301AF65DA1C54900B49F002C7914F341C90"
+    "benchmark_sha256": "FEAB5AC5EE245040082897435BC7CCE99A3FD54F25DA71577928D7A2414F4F13"
   }
 }

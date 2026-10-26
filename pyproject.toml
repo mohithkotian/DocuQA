@@ -10,6 +10,7 @@ requires-python = ">=3.11"
 dependencies = [
   "pypdf>=5,<7",
   "python-docx>=1.1,<2",
+  "python-pptx>=1.0,<2",
   "scikit-learn>=1.5,<2",
   "streamlit>=1.52,<2",
   "torch>=2.2,<3",
@@ -31,7 +32,7 @@ include = ["docuqa*"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
-addopts = "-ra"
+addopts = "-ra --import-mode=importlib"
 
 [tool.pyrefly]
 python-interpreter-path = "C:/Python314/python.exe"

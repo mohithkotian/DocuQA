@@ -27,7 +27,7 @@ def test_real_cricket_query_ranks_relevant_passage_and_preserves_evidence(retrie
 def test_real_cricket_question_retrieves_pitch_length(retriever: TfidfRetriever) -> None:
     results = retriever.search("How long is the cricket pitch?", top_k=2)
     assert results
-    assert results[0].source == "cricket_pitch.txt"
+    assert results[0].source in ("cricket_pitch.txt", "Cricket_Rules_Overview.pptx")
     assert "22 yards" in results[0].chunk.text
 
 
