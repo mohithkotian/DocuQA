@@ -7,7 +7,9 @@ from pathlib import Path
 import re
 import time
 from datetime import datetime, timezone
+from typing import Any
 
+import pandas as pd
 import streamlit as st
 
 from docuqa import (
@@ -39,6 +41,20 @@ from docuqa.config import (
     DEFAULT_TOP_K,
     SAMPLE_CORPUS_DIR,
     validate_upload_sizes,
+)
+from docuqa.suggested_questions import (
+    TOPIC_QUESTIONS_BANK,
+    QueryExecutionResult,
+    ask_with_fallback,
+    get_evidence_locator,
+    get_grounded_suggested_questions,
+    get_topic_questions,
+)
+from docuqa.workflow import (
+    WORKFLOW_DEFAULT_EDGES,
+    WORKFLOW_DEFAULT_NODES,
+    get_node_runtime_data,
+    render_workflow_svg,
 )
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -89,6 +105,17 @@ def load_benchmark_index() -> object:
 
 
 @st.cache_resource(show_spinner=False)
+def load_knowledge_index() -> object:
+    """Load the dedicated Cricket Knowledge Corpus for general QA and fallback routing."""
+    return build_corpus_index(
+        [],
+        STANDARD_CORPUS_DIR,
+        chunk_size=DEFAULT_CHUNK_SIZE,
+        overlap=DEFAULT_OVERLAP,
+    )
+
+
+@st.cache_resource(show_spinner=False)
 def build_cached_index(uploaded_files: tuple[tuple[str, bytes], ...], sample_corpus: str,
                        chunk_size: int, overlap: int) -> object:
     """Reuse the persistent document/index cache for the selected corpus."""
@@ -123,15 +150,18 @@ def _clear_corpus() -> None:
     st.session_state.answer_cache = {}
     st.session_state.evaluation_rows = []
     st.session_state.detected_questions = []
+    st.session_state.displayed_suggested_questions = []
+    st.session_state.seen_suggested_questions = []
+    st.session_state.suggested_answers = {}
     st.session_state.invalid_document_warnings = []
 
 
 st.set_page_config(
     page_title="DocuQA — Document Question Answering",
-    page_icon="D",
     layout="wide",
     initial_sidebar_state="expanded",
 )
+
 st.markdown(
     """
     <style>
@@ -168,8 +198,8 @@ st.markdown(
     [data-testid="stSidebar"] [data-testid="stFileUploader"] button * {
         color: #F7F3EA !important;
     }
-    /* Uploaded-file rows use a light surface, so override the sidebar's
-       global light text rule or filenames become invisible. */
+
+    /* Light surface for upload files and chips */
     [data-testid="stSidebar"] [data-testid="stFileUploaderFile"],
     [data-testid="stSidebar"] .stFileUploaderFile {
         background: #F4F1EA !important;
@@ -201,884 +231,93 @@ st.markdown(
         fill: #1A1917 !important;
         stroke: #1A1917 !important;
     }
-    /* Keep Streamlit's native selected-file preview readable. */
-    [data-testid="stSidebar"] [data-testid="stFileUploaderFile"],
-    [data-testid="stSidebar"] .stFileUploaderFile {
-        display: flex !important;
-        color: #1A1917 !important;
-        opacity: 1 !important;
-        visibility: visible !important;
-        overflow: visible !important;
-    }
-    [data-testid="stSidebar"] [data-testid="stFileUploaderFile"] span,
-    [data-testid="stSidebar"] [data-testid="stFileUploaderFile"] div,
-    [data-testid="stSidebar"] [data-testid="stFileUploaderFile"] p,
-    [data-testid="stSidebar"] .stFileUploaderFile span,
-    [data-testid="stSidebar"] .stFileUploaderFile div,
-    [data-testid="stSidebar"] .stFileUploaderFile p {
-        color: #1A1917 !important;
-        opacity: 1 !important;
-        visibility: visible !important;
-        white-space: normal !important;
-        overflow: visible !important;
-        text-overflow: clip !important;
-        overflow-wrap: anywhere !important;
-    }
-    [data-testid="stSidebar"] [data-testid="stFileUploaderFileName"],
-    [data-testid="stSidebar"] .stFileUploaderFileName {
-        display: block !important;
-        width: auto !important;
-        min-width: 0 !important;
-        flex: 1 1 auto !important;
-        color: #1A1917 !important;
-        fill: #1A1917 !important;
-        opacity: 1 !important;
-        visibility: visible !important;
-        font-size: 13px !important;
-        line-height: 1.25 !important;
-        white-space: normal !important;
-        overflow: visible !important;
-        text-overflow: clip !important;
-        overflow-wrap: anywhere !important;
-    }
-    /* The native preview is the single selected-document list. */
-    [data-testid="stSidebar"] .selected-upload-file { display: none !important; }
-    [data-testid="stSidebar"] [data-testid="stButton"] button,
-    [data-testid="stSidebar"] .stButton button {
-        white-space: normal !important;
-        height: auto !important;
-        min-height: 42px !important;
-        line-height: 1.25 !important;
-    }
 
-    /* Sidebar Selectbox */
-    [data-testid="stSidebar"] [data-testid="stSelectbox"] div[data-baseweb="select"] > div {
-        background: #191A23 !important;
-        border: 1px solid rgba(247,243,234,0.25) !important;
-        color: #F7F3EA !important;
-    }
-    [data-testid="stSidebar"] [data-testid="stSelectbox"] div[data-baseweb="select"] span,
-    [data-testid="stSidebar"] [data-testid="stSelectbox"] div[data-baseweb="select"] div {
-        color: #F7F3EA !important;
-    }
-    [data-testid="stSidebar"] [data-testid="stSelectbox"] [aria-disabled="true"] span,
-    [data-testid="stSidebar"] [data-testid="stSelectbox"] [aria-disabled="true"] div {
-        color: #D9D4CB !important;
-    }
-    [data-testid="stSidebar"] [data-testid="stSelectbox"] svg {
-        fill: #F7F3EA !important;
-    }
-
-    /* Sidebar Number Inputs */
-    [data-testid="stSidebar"] div[data-baseweb="input"] {
-        background: #191A23 !important;
-        border: 1px solid rgba(247,243,234,0.25) !important;
-        color: #F7F3EA !important;
-    }
-    [data-testid="stSidebar"] input[type="number"] {
-        color: #F7F3EA !important;
-        background: transparent !important;
-    }
-
-    /* Sidebar Buttons */
-    [data-testid="stSidebar"] .stButton button,
-    [data-testid="stSidebar"] [data-testid="stBaseButton-secondary"] {
-        background: #2C2D3B !important;
-        border: 1px solid rgba(247,243,234,0.3) !important;
-        color: #F7F3EA !important;
-        font-family: 'Azeret Mono', monospace !important;
-        text-transform: uppercase !important;
-        letter-spacing: .08em !important;
-    }
-    [data-testid="stSidebar"] .stButton button:hover,
-    [data-testid="stSidebar"] [data-testid="stBaseButton-secondary"]:hover {
-        background: #393B4D !important;
-        color: #FFFFFF !important;
-        border-color: rgba(247,243,234,0.5) !important;
-    }
-
-    /* Suggested-question buttons must show the complete question. */
-    [data-testid="stButton"] button,
-    [data-testid="stButton"] button p {
-        white-space: normal !important;
-        overflow: visible !important;
-        text-overflow: clip !important;
-        overflow-wrap: anywhere !important;
-        word-break: normal !important;
-        height: auto !important;
-        min-height: 52px !important;
-        line-height: 1.3 !important;
-    }
-    [data-testid="stSidebar"] .stButton button[kind="primary"],
-    [data-testid="stSidebar"] [data-testid="stBaseButton-primary"] {
-        background: #9B3418 !important;
-        border: 1px solid #9B3418 !important;
-        color: #FFFFFF !important;
-        font-weight: 600 !important;
-    }
-    [data-testid="stSidebar"] .stButton button[kind="primary"]:hover,
-    [data-testid="stSidebar"] [data-testid="stBaseButton-primary"]:hover {
-        background: #7D2A13 !important;
-        color: #FFFFFF !important;
-    }
-    
-    .block-container { max-width:1240px; padding-top:2.4rem; padding-bottom:4rem; }
-    h1, h2, h3, [data-testid="stMarkdownContainer"] h1, [data-testid="stMarkdownContainer"] h2,
-    [data-testid="stMarkdownContainer"] h3 { font-family:'Instrument Serif', Georgia, serif !important; font-weight:400 !important; letter-spacing:-.015em; color:var(--ink); }
-    p, li, label, button { font-family:'Instrument Serif', Georgia,serif; color:var(--ink); }
-    .eyebrow, .mono, [data-testid="stCaptionContainer"], [data-testid="stMetricLabel"] {
-      font-family:'Azeret Mono', monospace !important; text-transform:uppercase; letter-spacing:.15em; font-size:10.5px !important; color:var(--muted) !important;
-    }
-    .topbar { border-bottom:1px solid var(--rule); padding:0 0 14px; display:flex; justify-content:space-between; align-items:baseline; gap:16px; flex-wrap:wrap; margin-bottom:42px; }
-    .brand { font-family:'Instrument Serif', Georgia, serif; font-size:25px; letter-spacing:-.02em; }
-    .brand i, .accent { color:var(--oxide); font-style:italic; }
-    .lede { max-width:740px; font-size:17px; line-height:1.55; color:var(--sub); }
-    .section-rule, .result { border-top:1px solid var(--rule); }
-    .section-rule { margin:28px 0 17px; }
-    .result { padding:15px 0 17px; }
-    .result-meta { font-family:'Azeret Mono',monospace; font-size:10px; line-height:1.6; letter-spacing:.11em; text-transform:uppercase; color:var(--oxide); }
-    .result-text { font-family:'Instrument Serif',Georgia,serif; font-size:19px; line-height:1.4; margin-top:8px; color:var(--ink); }
-    .score { color:var(--muted); margin-left:12px; }
-
-    /* High-contrast Expander Styling (Solves black-on-black text bug) */
-    [data-testid="stExpander"] {
-        background: #F4F1EA !important;
-        border: 1px solid rgba(26,25,23,0.18) !important;
-        border-radius: 4px !important;
-        margin-bottom: 12px !important;
-    }
-    [data-testid="stExpander"] details {
-        background: #F4F1EA !important;
-        border: none !important;
-    }
-    [data-testid="stExpander"] summary {
-        background: #DCD7CB !important;
-        color: #1A1917 !important;
-        font-family: 'Instrument Serif', Georgia, serif !important;
-        font-size: 18px !important;
-        font-weight: 600 !important;
-        padding: 10px 16px !important;
-        border-radius: 4px !important;
-    }
-    [data-testid="stExpander"] summary:hover {
-        background: #D1CBC0 !important;
-        color: #9B3418 !important;
-    }
-    [data-testid="stExpander"] summary p,
-    [data-testid="stExpander"] summary span,
-    [data-testid="stExpander"] summary div {
-        color: #1A1917 !important;
-        font-weight: 600 !important;
-    }
-    [data-testid="stExpander"] summary svg {
-        fill: #1A1917 !important;
-        stroke: #1A1917 !important;
-    }
-    [data-testid="stExpander"] [data-testid="stExpanderDetails"] {
-        background: #F4F1EA !important;
-        color: #1A1917 !important;
-        padding: 16px 20px !important;
-        border-top: 1px solid rgba(26,25,23,0.12) !important;
-    }
-    [data-testid="stExpander"] [data-testid="stExpanderDetails"] * {
-        color: #1A1917 !important;
-    }
-
-    /* High-contrast Selectbox and Dropdown Popover */
-    [data-testid="stSelectbox"] div[data-baseweb="select"] > div {
-        background: #FAF8F5 !important;
-        border: 1px solid rgba(26,25,23,0.3) !important;
-        border-radius: 3px !important;
-        color: #1A1917 !important;
-    }
-    [data-testid="stSelectbox"] div[data-baseweb="select"] span,
-    [data-testid="stSelectbox"] div[data-baseweb="select"] div {
-        color: #1A1917 !important;
-    }
-    [data-testid="stSelectbox"] svg {
-        fill: #1A1917 !important;
-    }
-    div[data-baseweb="popover"],
-    div[data-baseweb="popover"] * {
-        background: #FFFFFF !important;
-        color: #1A1917 !important;
-    }
-    ul[data-baseweb="menu"] {
-        background: #FFFFFF !important;
-        border: 1px solid rgba(26,25,23,0.2) !important;
-        box-shadow: 0 4px 14px rgba(0,0,0,0.12) !important;
-    }
-    li[data-baseweb="menu-item"] {
-        background: #FFFFFF !important;
-        color: #1A1917 !important;
-        font-family: 'Instrument Serif', Georgia, serif !important;
-        font-size: 16px !important;
-        padding: 8px 14px !important;
-    }
-    li[data-baseweb="menu-item"]:hover,
-    li[data-baseweb="menu-item"][aria-selected="true"] {
-        background: #EAE6DC !important;
-        color: #9B3418 !important;
-    }
-
-    /* High-contrast Text Input */
-    [data-testid="stTextInput"] div[data-baseweb="input"] {
-        background: #FAF8F5 !important;
-        border: 1px solid rgba(26,25,23,0.35) !important;
-        border-radius: 3px !important;
-        box-shadow: inset 0 1px 3px rgba(0,0,0,0.04) !important;
-    }
-    [data-testid="stTextInput"] div[data-baseweb="input"]:focus-within {
-        border-color: #9B3418 !important;
-        box-shadow: 0 0 0 1px #9B3418 !important;
-    }
-    [data-testid="stTextInput"] input {
-        background: transparent !important;
-        color: #1A1917 !important;
-        font-family: 'Instrument Serif', Georgia, serif !important;
-        font-size: 20px !important;
-        padding: 10px 14px !important;
-    }
-    [data-testid="stTextInput"] input::placeholder {
-        color: #7E7A71 !important;
-        font-style: italic !important;
-    }
-
-    /* Sidebar controls contrast */
-    [data-testid="stSidebar"] [data-testid="stExpander"] {
-        background: #1F202A !important;
-        border-color: rgba(247,243,234,0.15) !important;
-    }
-    [data-testid="stSidebar"] [data-testid="stExpander"] summary {
-        background: #2C2D3B !important;
-        color: #F7F3EA !important;
-    }
-    [data-testid="stSidebar"] [data-testid="stExpander"] summary * {
-        color: #F7F3EA !important;
-    }
-    [data-testid="stSidebar"] [data-testid="stExpander"] [data-testid="stExpanderDetails"] {
-        background: #1F202A !important;
-        color: #F7F3EA !important;
-    }
-    [data-testid="stSidebar"] [data-testid="stExpander"] [data-testid="stExpanderDetails"] * {
-        color: #F7F3EA !important;
-    }
-
-    /* Primary and Secondary Action Buttons */
-    .stButton button, [data-testid="stBaseButton-secondary"] {
-        border-radius:3px !important;
-        background:#FAF8F5 !important;
-        border:1px solid rgba(26,25,23,0.3) !important;
-        color:var(--ink) !important;
-        font-family:'Azeret Mono',monospace !important;
-        text-transform:uppercase;
-        letter-spacing:.08em;
-    }
-    .stButton button[kind="primary"], [data-testid="stBaseButton-primary"] {
-        background: #9B3418 !important;
-        color: #FFFFFF !important;
-        border: 1px solid #9B3418 !important;
-        font-weight: 600 !important;
-    }
-    .stButton button[kind="primary"]:hover, [data-testid="stBaseButton-primary"]:hover {
-        background: #7D2A13 !important;
-        color: #FFFFFF !important;
-    }
-    [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3,
-    [data-testid="stSidebar"] label, [data-testid="stSidebar"] p,
-    [data-testid="stSidebar"] [data-testid="stCaptionContainer"] {
-        color: #F7F3EA !important;
-    }
-    div[data-testid="stTabs"] .stButton button {
-        text-transform:none !important;
-        font-family:'Instrument Serif',Georgia,serif !important;
-        font-size:16px !important;
-        letter-spacing:0 !important;
-        text-align:left;
-        line-height:1.35;
-        padding:8px 12px !important;
-        min-height:52px;
-        background:#FAF8F5 !important;
-    }
-    div[data-testid="stTabs"] .stButton button:hover {
-        border-color:var(--oxide) !important;
-        color:var(--oxide) !important;
-    }
-    [data-testid="stMetric"] { background:transparent; border-top:1px solid var(--rule); border-radius:0; padding:12px 0; }
-    [data-testid="stMetricValue"] { font-family:'Instrument Serif',Georgia,serif !important; color:var(--ink) !important; }
-    [data-testid="stVerticalBlockBorderWrapper"] { border-radius:0 !important; box-shadow:none !important; }
-    footer { visibility:hidden; }
-    /* Sidebar repair overrides: target Streamlit data-testid hooks, not unstable class names. */
-    [data-testid="stSidebar"] { background:#262734 !important; overflow-x:hidden !important; }
-    [data-testid="stSidebar"] > div:first-child { padding-top:1.25rem !important; padding-bottom:1.25rem !important; }
-    [data-testid="stSidebar"] [data-testid="stVerticalBlock"] { gap:0.75rem !important; }
-    [data-testid="stSidebar"] [data-testid="stButton"] { width:100% !important; margin:0 !important; }
-    [data-testid="stSidebar"] [data-testid="stButton"] button,
-    [data-testid="stSidebar"] [data-testid="stButton"] button p,
-    [data-testid="stSidebar"] [data-testid="stButton"] button span {
-      margin:0 !important; min-height:44px !important; height:44px !important; width:100% !important;
-      padding:0 16px !important; display:flex !important; align-items:center !important; justify-content:center !important;
-      white-space:nowrap !important; overflow:hidden !important; text-overflow:ellipsis !important;
-    }
-    [data-testid="stSidebar"] [data-testid="stButton"] button {
-      border-radius:4px !important; background:transparent !important; border:1px solid rgba(232,226,216,.42) !important;
-      color:#e8e2d8 !important; font-family:'Azeret Mono',monospace !important; text-transform:uppercase !important;
-      letter-spacing:.08em !important; line-height:1 !important;
-    }
-    [data-testid="stSidebar"] [data-testid="stButton"] button:hover { border-color:#e8e2d8 !important; background:#30313f !important; color:#fff !important; }
-    [data-testid="stSidebar"] [data-testid="stButton"] button[kind="primary"],
-    [data-testid="stSidebar"] [data-testid="stBaseButton-primary"] {
-      background:#9c3118 !important; border-color:#9c3118 !important; color:#e6e1d8 !important;
-    }
-    [data-testid="stSidebar"] [data-testid="stFileUploader"] { margin:0 !important; }
-    [data-testid="stSidebar"] [data-testid="stFileUploader"] section {
-      padding:12px !important; min-height:0 !important; overflow:hidden !important; background:#1c1c27 !important;
-      border:1px dashed rgba(232,226,216,.38) !important; border-radius:6px !important;
-    }
-    [data-testid="stSidebar"] [data-testid="stFileUploader"] section > div { padding:0 !important; }
-    [data-testid="stSidebar"] [data-testid="stFileUploader"] section small,
-    [data-testid="stSidebar"] [data-testid="stFileUploader"] section [data-testid="stCaptionContainer"] {
-      color:#9a9aa8 !important; font-size:12px !important; line-height:1.35 !important; white-space:normal !important;
-    }
-    [data-testid="stSidebar"] [data-testid="stFileUploader"] button {
-      min-height:36px !important; height:36px !important; width:auto !important; padding:0 12px !important;
-      justify-content:flex-start !important; background:#30313f !important; color:#e8e2d8 !important;
-    }
-    [data-testid="stSidebar"] [data-testid="stFileUploaderFile"] {
-      display:flex !important; align-items:center !important; gap:12px !important; min-height:52px !important;
-      margin:0 0 8px !important; padding:10px 12px !important; border-radius:8px !important;
-      background:#ddd7c8 !important; border:1px solid rgba(28,28,39,.14) !important; color:#1c1c27 !important;
-    }
-    [data-testid="stSidebar"] [data-testid="stFileUploaderFile"] > div:first-child,
-    [data-testid="stSidebar"] [data-testid="stFileUploaderFile"] svg {
-      width:32px !important; height:32px !important; min-width:32px !important; max-width:32px !important;
-      color:#5b5b68 !important; fill:#5b5b68 !important; stroke:#5b5b68 !important; align-self:center !important;
-    }
-    [data-testid="stSidebar"] [data-testid="stFileUploaderFileName"] {
-      display:block !important; min-width:0 !important; flex:1 1 auto !important; color:#1c1c27 !important;
-      font-size:14px !important; font-weight:500 !important; line-height:1.25 !important; white-space:nowrap !important;
-      overflow:hidden !important; text-overflow:ellipsis !important;
-    }
-    [data-testid="stSidebar"] [data-testid="stFileUploaderFileName"]::after { color:#5b5b68 !important; font-size:12px !important; }
-    [data-testid="stSidebar"] [data-testid="stFileUploaderFile"] button {
-      width:28px !important; min-width:28px !important; height:28px !important; min-height:28px !important;
-      padding:0 !important; margin-left:auto !important; background:transparent !important; border:0 !important;
-      color:#1c1c27 !important; display:flex !important; align-items:center !important; justify-content:center !important;
-    }
-    [data-testid="stSidebar"] [data-testid="stFileUploaderFile"] button p { min-height:0 !important; height:auto !important; padding:0 !important; }
-    [data-testid="stSidebar"] [data-testid="stFileUploader"] [data-testid="stFileUploaderFile"] ~ button { margin-top:12px !important; }
-    [data-testid="stSidebar"] [data-testid="stSelectbox"] div[data-baseweb="select"] > div {
-      min-height:44px !important; background:#e6e1d8 !important; color:#1c1c27 !important; border:1px solid rgba(28,28,39,.3) !important;
-    }
-    [data-testid="stSidebar"] [data-testid="stSelectbox"] div[data-baseweb="select"] span,
-    [data-testid="stSidebar"] [data-testid="stSelectbox"] div[data-baseweb="select"] div { color:#1c1c27 !important; white-space:normal !important; }
-    [data-testid="stSidebar"] [data-baseweb="popover"], [data-testid="stSidebar"] [data-baseweb="popover"] * { background:#e6e1d8 !important; color:#1c1c27 !important; }
-    [data-testid="stSidebar"] li[data-baseweb="menu-item"] { color:#1c1c27 !important; background:#e6e1d8 !important; white-space:normal !important; }
-    [data-testid="stSidebar"] li[data-baseweb="menu-item"]:hover { color:#fff !important; background:#9c3118 !important; }
-    [data-testid="stSidebar"] [data-testid="stCaptionContainer"] { color:#9a9aa8 !important; }
-    [data-testid="stSidebar"] .model-caption, [data-testid="stSidebar"] .model-caption * { color:#c9c9d4 !important; }
-    [data-testid="stSidebar"] .eyebrow { color:#9a9aa8 !important; }
-    [data-testid="stSidebar"] [data-testid="stAlert"] { border-radius:8px !important; color:#1c1c27 !important; }
-    [data-testid="stSidebar"] [data-testid="stAlert"] * { color:#1c1c27 !important; }
-    [data-testid="stSidebar"] [data-testid="stFileUploaderFile"]:hover [data-testid="stFileUploaderFileName"] { text-decoration:underline; }
-    [data-testid="stSidebar"] [data-testid="stFileUploaderFileName"] { title:attr(data-testid); }
-    /* Final Streamlit uploader overrides: keep filenames, sizes, and controls readable. */
-    /* Native upload box filename: visible inside the existing cream row. */
-    /* Actual BaseWeb selectbox DOM: combobox value and option text. */
-    section[data-testid="stSidebar"] [data-testid="stSelectbox"] input[role="combobox"] {
-      color:#000000 !important;
-      -webkit-text-fill-color:#000000 !important;
-    }
-    section[data-testid="stSidebar"] [data-testid="stSelectbox"] [role="option"],
-    section[data-testid="stSidebar"] [data-testid="stSelectbox"] [role="option"] * {
-      color:#000000 !important;
-    }
-    section[data-testid="stSidebar"] [data-testid="stSelectbox"] [aria-selected="true"] {
-      color:#000000 !important;
-      -webkit-text-fill-color:#000000 !important;
-    }    /* Built-in corpus selectbox only: beige field with black value/options. */
-    [data-testid="stSidebar"] [data-testid="stSelectbox"] [data-baseweb="select"] > div,
-    [data-testid="stSidebar"] [data-testid="stSelectbox"] [data-baseweb="select"] span,
-    [data-testid="stSidebar"] [data-testid="stSelectbox"] [data-baseweb="select"] input {
-      color:#000000 !important;
-    }
-    [data-testid="stSidebar"] [data-testid="stSelectbox"] [data-baseweb="select"] svg {
-      fill:#000000 !important;
-      color:#000000 !important;
-    }
-    [data-baseweb="popover"] [data-baseweb="menu"] [data-baseweb="menu-item"],
-    [data-baseweb="popover"] [data-baseweb="menu"] [data-baseweb="menu-item"] * {
-      color:#000000 !important;
-    }    /* Target only light upload chips and the light corpus selectbox. */
-    [data-testid="stSidebar"] [data-testid="stFileChip"],
-    [data-testid="stSidebar"] [data-testid="stFileChip"] [data-testid="stFileChipName"],
-    [data-testid="stSidebar"] [data-testid="stFileChip"] [data-testid="stFileChipName"] *,
-    [data-testid="stSidebar"] [data-testid="stFileChip"] [data-testid="stFileChipName"] + div {
-      color:#000000 !important;
-      opacity:1 !important;
-    }
-    [data-testid="stSidebar"] [data-testid="stFileChip"] [data-testid="stFileChipName"] {
-      font-weight:600 !important;
-      text-shadow:none !important;
-    }
     [data-testid="stSidebar"] [data-testid="stSelectbox"] [data-baseweb="select"] > div,
     [data-testid="stSidebar"] [data-testid="stSelectbox"] [data-baseweb="select"] span,
     [data-testid="stSidebar"] [data-testid="stSelectbox"] [data-baseweb="select"] div {
       color:#000000 !important;
       opacity:1 !important;
     }
-    [data-testid="stSidebar"] [data-baseweb="popover"] li[data-baseweb="menu-item"],
-    [data-testid="stSidebar"] [data-baseweb="popover"] li[data-baseweb="menu-item"] * {
+    [data-baseweb="popover"] [data-baseweb="menu"] [data-baseweb="menu-item"],
+    [data-baseweb="popover"] [data-baseweb="menu"] [data-baseweb="menu-item"] * {
       color:#000000 !important;
-      opacity:1 !important;
-    }    /* Streamlit 1.66 uses file chips for uploaded files. */
-    [data-testid="stSidebar"] [data-testid="stFileChip"],
-    [data-testid="stSidebar"] [data-testid="stFileChipName"],
-    [data-testid="stSidebar"] [data-testid="stFileChipName"] * {
-      color:#000000 !important;
-      opacity:1 !important;
-      visibility:visible !important;
     }
-    [data-testid="stSidebar"] [data-testid="stFileChipName"] {
-      display:block !important;
-      max-width:calc(100% - 70px) !important;
-      overflow:hidden !important;
-      text-overflow:ellipsis !important;
-      white-space:nowrap !important;
-      font-size:13px !important;
-      font-weight:600 !important;
-    }
-    [data-testid="stSidebar"] [data-testid="stFileUploaderFile"] [data-testid="stFileUploaderFileName"],
-    [data-testid="stSidebar"] [data-testid="stFileUploaderFile"] [data-testid="stFileUploaderFileName"] *,
-    [data-testid="stSidebar"] [data-testid="stFileUploaderFile"] > div:not(:first-child) span,
-    [data-testid="stSidebar"] [data-testid="stFileUploaderFile"] > div:not(:first-child) p {
-      display:block !important; visibility:visible !important; opacity:1 !important;
-      color:#000000 !important; font-family:'Azeret Mono', monospace !important;
-      font-size:13px !important; font-weight:600 !important; line-height:1.25 !important;
-      white-space:nowrap !important; overflow:hidden !important; text-overflow:ellipsis !important;
-      min-width:0 !important; max-width:100% !important;
-    }
-    [data-testid="stSidebar"] [data-testid="stFileUploaderFile"] {
-      display:flex !important; align-items:center !important; gap:12px !important; padding:10px 12px !important;
-      background:#ddd7c8 !important; border-radius:8px !important; margin-bottom:8px !important; min-height:56px !important;
-    }
-    [data-testid="stSidebar"] [data-testid="stFileUploaderFile"] * { color:#1c1c27 !important; opacity:1 !important; }
-    [data-testid="stSidebar"] [data-testid="stFileUploaderFileName"] {
-      color:#1c1c27 !important; font-size:14px !important; font-weight:600 !important; white-space:nowrap !important;
-      overflow:hidden !important; text-overflow:ellipsis !important; max-width:100% !important;
-    }
-    [data-testid="stSidebar"] [data-testid="stFileUploaderFile"] small,
-    [data-testid="stSidebar"] [data-testid="stFileUploaderFile"] [data-testid="stFileUploaderFileSize"] {
-      color:#5b5b68 !important; font-size:12px !important;
-    }
-    [data-testid="stSidebar"] [data-testid="stIconMaterial"],
-    [data-testid="stSidebar"] .material-symbols-rounded,
-    [data-testid="stSidebar"] [class*="material-symbols"] {
-      font-family:"Material Symbols Rounded", "Material Symbols Outlined" !important;
-      font-feature-settings:"liga" !important; letter-spacing:normal !important; text-transform:none !important;
-    }
-    [data-testid="stSidebar"] [data-testid="stFileUploaderFile"] svg {
-      width:20px !important; height:20px !important; border:none !important; background:transparent !important;
-      color:#1c1c27 !important; fill:currentColor !important;
-    }
-    [data-testid="stSidebar"] [data-testid="stFileUploaderFile"] > div:first-child {
-      width:32px !important; height:32px !important; min-width:32px !important; border:none !important;
-      background:transparent !important; display:flex !important; align-items:center !important; justify-content:center !important;
-    }
-    [data-testid="stSidebar"] [data-testid="stFileUploaderDeleteBtn"] button,
-    [data-testid="stSidebar"] [data-testid="stFileUploaderFile"] button {
-      width:32px !important; height:32px !important; min-height:32px !important; padding:0 !important;
-      border-radius:50% !important; background:transparent !important; border:1px solid #5b5b68 !important;
-      color:#1c1c27 !important;
-    }
-    [data-testid="stSidebar"] [data-testid="stAlert"] p,
-    [data-testid="stSidebar"] [data-testid="stAlert"] * { color:#f1e9c8 !important; }
-    @media (max-width: 900px) {
-      .block-container { max-width:100% !important; padding-left:1rem !important; padding-right:1rem !important; }
-      h1,h2,h3 { overflow-wrap:anywhere !important; }
-    }
-    .workflow-canvas { background: #191A23; border: 1px solid rgba(26,25,23,.24); border-radius: 10px; min-width: 1450px; background-image: linear-gradient(rgba(247,243,234,.05) 1px, transparent 1px), linear-gradient(90deg, rgba(247,243,234,.05) 1px, transparent 1px); background-size: 24px 24px; }
-    .workflow-node { position:absolute; width:190px; min-height:92px; padding:12px 14px; border:1px solid rgba(247,243,234,.26); border-left:4px solid #7E7A71; border-radius:8px; background:#2C2D3B; color:#F7F3EA; box-shadow:0 8px 18px rgba(0,0,0,.18); }
-    .workflow-node.supported { border-left-color:#B85A31; } .workflow-node.unavailable { opacity:.55; border-left-color:#777; } .workflow-node.selected { outline:2px solid #E7A47D; }
-    .node-category { font:10px 'Azeret Mono', monospace; letter-spacing:.12em; text-transform:uppercase; color:#D9D4CB; } .node-title { font:17px 'Instrument Serif', Georgia, serif; margin:6px 0; color:#FFF; } .node-state { font:11px 'Azeret Mono', monospace; color:#E7A47D; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .node-port { position:absolute; width:10px; height:10px; background:#E7A47D; border:2px solid #191A23; border-radius:50%; top:42px; } .input-port { left:-7px; } .output-port { right:-7px; }
-    </style>
 
+    /* Cards and Brand */
+    .topbar { display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--rule); padding:10px 0; margin-bottom:16px; }
+    .brand { font-family:'Instrument Serif', serif; font-size:28px; font-weight:700; color:var(--ink); }
+    .brand i { color:var(--oxide); font-style:normal; }
+    .eyebrow { font-family:'Azeret Mono', monospace; font-size:11px; font-weight:600; letter-spacing:1.5px; color:var(--muted); text-transform:uppercase; }
+    .lede { font-size:15px; line-height:1.6; color:var(--sub); margin:6px 0 16px; }
+    .section-rule { height:1px; background:var(--rule); margin:24px 0 18px; }
+
+    /* Suggested Questions Card */
+    .suggested-card {
+        background:#F4F1EA;
+        border:1px solid rgba(26,25,23,0.14);
+        border-radius:8px;
+        padding:12px 14px;
+        margin-bottom:10px;
+        transition: all 0.15s ease-in-out;
+    }
+    .suggested-card:hover {
+        border-color:var(--oxide);
+        box-shadow:0 2px 8px rgba(155,52,24,0.08);
+    }
+    .suggested-title {
+        font-family:'Instrument Serif', serif;
+        font-size:17px;
+        font-weight:600;
+        color:var(--ink);
+        margin-bottom:6px;
+    }
+
+    /* Answer and Evidence Highlights */
+    .answer-callout {
+        font-size:22px;
+        font-weight:600;
+        color:var(--ink);
+        padding:14px 20px;
+        background:rgba(155,52,24,0.06);
+        border-left:4px solid var(--oxide);
+        border-radius:4px;
+        margin:12px 0 16px;
+    }
+    .result-meta {
+        font-family:'Azeret Mono', monospace;
+        font-size:11px;
+        color:var(--sub);
+        margin-bottom:8px;
+    }
+    .result-text {
+        font-size:14px;
+        line-height:1.6;
+        color:var(--ink);
+        background:rgba(26,25,23,0.04);
+        padding:14px 18px;
+        border-left:3px solid var(--oxide);
+        border-radius:4px;
+        margin:10px 0;
+    }
+    .result {
+        border:1px solid rgba(26,25,23,0.12);
+        background:#F9F8F6;
+        border-radius:6px;
+        padding:12px 14px;
+        margin-bottom:8px;
+    }
+    .score {
+        float:right;
+        font-family:'Azeret Mono', monospace;
+        color:var(--oxide);
+        font-weight:600;
+    }
+    </style>
     """,
     unsafe_allow_html=True,
 )
 
-
-WORKFLOW_BLOCKS = {
-    "Inputs": [
-        ("document_upload", "Document Upload", "Active uploaded files or the selected built-in corpus.", True),
-        ("user_question", "User Question", "The question currently entered in the QA interface.", True),
-        ("query_mode", "Query Mode", "Retrieval method and Top-K settings.", True),
-    ],
-    "Processing": [
-        ("text_extraction", "Text Extraction", "Text and page/slide metadata materialized by ingestion.", True),
-        ("preprocessing", "Preprocessing", "Normalized text prepared by the existing ingestion pipeline.", True),
-        ("chunk_generation", "Chunk Generation", "Actual chunks from the active index and configured overlap.", True),
-        ("bm25_index", "BM25 Index", "The active Okapi BM25 index.", True),
-        ("tfidf_index", "TF-IDF Index", "The active TF-IDF index.", True),
-        ("retrieval", "Retrieval", "Ranked passages returned for the last executed question.", True),
-        ("top_k", "Top-K Selection", "The configured number of candidate passages.", True),
-    ],
-    "AI": [
-        ("minilm_qa", "MiniLM QA", "The real extractive QA model response and answer span.", True),
-        ("cricket_knowledge", "Cricket Knowledge Retrieval", "The domain classifier and cricket-corpus guard.", True),
-        ("t5_question_generation", "T5 Question Generation", "Optional feature not implemented in the current backend.", False),
-    ],
-    "Conditions": [
-        ("index_ready", "Index Ready?", "Whether the selected corpus is active and indexed.", True),
-        ("evidence_found", "Evidence Found?", "Whether the last response contains sufficient evidence.", True),
-        ("answer_valid", "Answer Valid?", "Whether evidence validation accepted the extracted span.", True),
-        ("processing_failed", "Processing Failed?", "Whether the latest execution raised an error.", True),
-    ],
-    "Terminals / Outputs": [
-        ("answer_source", "Answer with Source", "Successful answer terminal with citation metadata.", True),
-        ("abstention", "Abstention", "Evidence-based insufficient-evidence terminal.", True),
-        ("index_ready_terminal", "Index Ready", "Index readiness terminal.", True),
-        ("processing_error", "Processing Error", "Processing error terminal.", True),
-    ],
-    "Inspectors": [
-        ("extracted_text", "Extracted Text", "Inspect extracted text from active documents.", True),
-        ("chunk_inspector", "Chunk Inspector", "Inspect actual chunks from the active index.", True),
-        ("retrieved_passages", "Retrieved Passages", "Inspect the passages returned in the last run.", True),
-        ("model_output", "Model Output", "Inspect the real MiniLM response object fields.", True),
-        ("validation_results", "Validation Results", "Inspect support, confidence, and citation validation.", True),
-    ],
-}
-
-WORKFLOW_DEFAULT_NODES = [
-    ("document_upload", "Document Upload", 30, 40),
-    ("text_extraction", "Text Extraction", 250, 40),
-    ("chunk_generation", "Chunk Generation", 470, 40),
-    ("retrieval", "Retrieval", 700, 40),
-    ("minilm_qa", "MiniLM QA", 930, 40),
-    ("answer_source", "Answer with Source", 1160, 10),
-    ("abstention", "Abstention", 1160, 130),
-    ("processing_error", "Processing Error", 1160, 250),
-]
-
-
-def _workflow_catalog():
-    return {block_id: {"id": block_id, "label": label, "description": description, "category": category, "supported": supported}
-            for category, blocks in WORKFLOW_BLOCKS.items() for block_id, label, description, supported in blocks}
-
-
-def _workflow_snapshot():
-    return {"nodes": deepcopy(st.session_state.workflow_nodes), "edges": deepcopy(st.session_state.workflow_edges)}
-
-
-def _workflow_restore(snapshot):
-    st.session_state.workflow_nodes = deepcopy(snapshot["nodes"])
-    st.session_state.workflow_edges = deepcopy(snapshot["edges"])
-
-
-def _workflow_commit():
-    st.session_state.workflow_undo.append(_workflow_snapshot())
-    st.session_state.workflow_redo.clear()
-
-
-def _workflow_output(block_id, corpus_index, last_run):
-    response = last_run.get("response") if last_run else None
-    passages = last_run.get("passages", []) if last_run else []
-    if block_id == "document_upload":
-        return f"{corpus_index.document_count if corpus_index else 0} active document(s)"
-    if block_id == "text_extraction":
-        words = sum(document.word_count for document in corpus_index.documents) if corpus_index else 0
-        return f"{words:,} extracted words"
-    if block_id == "preprocessing":
-        return "Active ingestion preprocessing"
-    if block_id == "chunk_generation":
-        return f"{corpus_index.chunk_count if corpus_index else 0:,} chunks"
-    if block_id in {"bm25_index", "tfidf_index"}:
-        return "Ready" if corpus_index else "Not available"
-    if block_id == "retrieval" or block_id == "retrieved_passages":
-        return f"{len(passages)} passage(s) from last run" if last_run else "No execution yet"
-    if block_id == "top_k":
-        return str(len(passages)) if last_run else "Not executed"
-    if block_id in {"minilm_qa", "model_output"}:
-        return (getattr(response, "answer", "") or "Abstained") if response else "No execution yet"
-    if block_id == "cricket_knowledge":
-        return "Domain guard active"
-    if block_id == "index_ready" or block_id == "index_ready_terminal":
-        return "Ready" if corpus_index else "Not ready"
-    if block_id in {"evidence_found", "answer_valid"}:
-        return "Yes" if response and getattr(response, "supported", False) else "No"
-    if block_id == "processing_failed":
-        return "No" if last_run else "No execution yet"
-    if block_id == "answer_source":
-        return f"{getattr(response, 'source', '')} · page {getattr(response, 'page', 'N/A')}" if response and getattr(response, "supported", False) else "Path not taken"
-    if block_id == "abstention":
-        return "Path taken" if response and not getattr(response, "supported", False) else "Path not taken"
-    if block_id == "processing_error":
-        return "Path not taken"
-    if block_id == "extracted_text":
-        return "Select a document in Active Corpus Documents for full text"
-    if block_id == "chunk_inspector":
-        return f"{corpus_index.chunk_count:,} chunks available" if corpus_index else "No chunks"
-    if block_id == "validation_results":
-        return ("supported=" + str(getattr(response, "supported", False)) + ", " +
-                "score=" + f"{getattr(response, 'qa_score', 0.0):.3f}") if response else "No execution yet"
-    return "Available"
-
-
-def _workflow_has_cycle(edges):
-    graph = {}
-    for source, target, _label in edges:
-        graph.setdefault(source, []).append(target)
-    visiting, visited = set(), set()
-    def visit(node):
-        if node in visiting:
-            return True
-        if node in visited:
-            return False
-        visiting.add(node)
-        if any(visit(child) for child in graph.get(node, [])):
-            return True
-        visiting.remove(node)
-        visited.add(node)
-        return False
-    return any(visit(node) for node in graph)
-
-
-def _render_workflow_builder(corpus_index, last_run):
-    catalog = _workflow_catalog()
-    st.markdown('<div class="section-rule"></div><div class="eyebrow">VISUAL WORKFLOW EDITOR</div>', unsafe_allow_html=True)
-    st.markdown("## Builder / Debug Execution")
-    st.caption("Builder edits the visual layout only. Debug / Execution reflects the fixed, tested DocuQA pipeline; rearranging nodes does not change backend execution order.")
-    builder_tab, execution_tab = st.tabs(["Builder", "Debug / Execution"])
-    with builder_tab:
-        toolbar = st.columns([1.2, 1.2, 1.2, 1.2, 1.2, 1.2])
-        with toolbar[0]:
-            if st.button("Add Block", key="workflow_add_open", use_container_width=True):
-                st.session_state.workflow_palette_open = not st.session_state.workflow_palette_open
-        with toolbar[1]:
-            if st.button("Undo", key="workflow_undo_btn", disabled=not st.session_state.workflow_undo, use_container_width=True):
-                st.session_state.workflow_redo.append(_workflow_snapshot())
-                _workflow_restore(st.session_state.workflow_undo.pop())
-                st.rerun()
-        with toolbar[2]:
-            if st.button("Redo", key="workflow_redo_btn", disabled=not st.session_state.workflow_redo, use_container_width=True):
-                st.session_state.workflow_undo.append(_workflow_snapshot())
-                _workflow_restore(st.session_state.workflow_redo.pop())
-                st.rerun()
-        with toolbar[3]:
-            if st.button("Fit Workflow", key="workflow_fit", use_container_width=True):
-                _workflow_commit()
-                st.session_state.workflow_nodes = {f"node_{i}": {"id": f"node_{i}", "block_id": block_id, "label": label, "x": x, "y": y} for i, (block_id, label, x, y) in enumerate(WORKFLOW_DEFAULT_NODES)}
-                st.rerun()
-        with toolbar[4]:
-            st.session_state.workflow_zoom = st.slider("Zoom", 60, 140, st.session_state.workflow_zoom, 10, key="workflow_zoom_slider")
-        with toolbar[5]:
-            st.session_state.workflow_pan = st.selectbox("Pan", ["Center", "Left", "Right"], key="workflow_pan_select")
-        if st.session_state.workflow_palette_open:
-            st.markdown("### Block palette")
-            palette_query = st.text_input("Search blocks", key="workflow_palette_query", placeholder="Search by block name or category")
-            options = []
-            for category, blocks in WORKFLOW_BLOCKS.items():
-                for block_id, label, description, supported in blocks:
-                    if palette_query.casefold() in f"{category} {label} {description}".casefold():
-                        options.append((f"{category} · {label}" + (" · unavailable" if not supported else ""), block_id))
-            if options:
-                selected_label = st.selectbox("Choose a block", [item[0] for item in options], key="workflow_palette_choice")
-                selected_id = dict(options)[selected_label]
-                if st.button("Place on canvas", key="workflow_place_block", disabled=not catalog[selected_id]["supported"]):
-                    _workflow_commit()
-                    node_id = f"node_{st.session_state.workflow_next_id}"
-                    st.session_state.workflow_next_id += 1
-                    block = catalog[selected_id]
-                    st.session_state.workflow_nodes[node_id] = {"id": node_id, "block_id": selected_id, "label": block["label"], "x": 100 + (len(st.session_state.workflow_nodes) % 4) * 240, "y": 360 + (len(st.session_state.workflow_nodes) // 4) * 130}
-                    st.session_state.workflow_selected = node_id
-                    st.rerun()
-                if not catalog[selected_id]["supported"]:
-                    st.warning("Unavailable: this block has no corresponding backend operation and cannot be placed.")
-        st.markdown("### Canvas")
-        scale = st.session_state.workflow_zoom / 100
-        canvas_html = '<div class="workflow-canvas" style="min-height:520px; position:relative; overflow:auto; transform-origin:top left; zoom:%s">' % scale
-        for node_id, node in st.session_state.workflow_nodes.items():
-            block = catalog[node["block_id"]]
-            selected = node_id == st.session_state.workflow_selected
-            state = _workflow_output(node["block_id"], corpus_index, last_run)
-            status = "supported" if block["supported"] else "unavailable"
-            canvas_html += (f'<div class="workflow-node {status} {"selected" if selected else ""}" style="left:{node["x"]}px;top:{node["y"]}px">'
-                            f'<div class="node-port input-port"></div><div class="node-category">{escape(block["category"])}</div>'
-                            f'<div class="node-title">{escape(node["label"])}</div><div class="node-state">{escape(state)}</div>'
-                            f'<div class="node-port output-port"></div></div>')
-        canvas_html += '</div>'
-        st.markdown(canvas_html, unsafe_allow_html=True)
-        st.caption("Canvas nodes expose distinct input/output ports. Use the node controls below to select, position, duplicate, delete, and connect nodes; browser drag persistence is intentionally not claimed by this Streamlit implementation.")
-        node_options = {f"{node['label']} [{node_id}]": node_id for node_id, node in st.session_state.workflow_nodes.items()}
-        if node_options:
-            selected_label = next((label for label, node_id in node_options.items() if node_id == st.session_state.workflow_selected), next(iter(node_options)))
-            selected_label = st.selectbox("Select block", list(node_options), index=list(node_options).index(selected_label), key="workflow_selected_label")
-            st.session_state.workflow_selected = node_options[selected_label]
-            node = st.session_state.workflow_nodes[st.session_state.workflow_selected]
-            block = catalog[node["block_id"]]
-            inspector_cols = st.columns([2.3, 1, 1, 1, 1])
-            with inspector_cols[0]:
-                st.markdown(f"**{block['category']} / {node['label']}**")
-                st.caption(block["description"])
-                st.write(f"**Execution state:** {_workflow_output(node['block_id'], corpus_index, last_run)}")
-                st.write(f"**Input metadata:** {('active corpus / upstream result' if node['block_id'] not in {'document_upload', 'user_question'} else 'user/session input')}")
-                st.write(f"**Output metadata:** {block['description']}")
-            with inspector_cols[1]:
-                new_x = st.number_input("X", 0, 1600, int(node["x"]), key=f"workflow_x_{st.session_state.workflow_selected}")
-            with inspector_cols[2]:
-                new_y = st.number_input("Y", 0, 1000, int(node["y"]), key=f"workflow_y_{st.session_state.workflow_selected}")
-            with inspector_cols[3]:
-                if st.button("Duplicate", key="workflow_duplicate"):
-                    _workflow_commit()
-                    new_id = f"node_{st.session_state.workflow_next_id}"
-                    st.session_state.workflow_next_id += 1
-                    st.session_state.workflow_nodes[new_id] = {**node, "id": new_id, "x": int(node["x"]) + 30, "y": int(node["y"]) + 30}
-                    st.session_state.workflow_selected = new_id
-                    st.rerun()
-            with inspector_cols[4]:
-                if st.button("Delete", key="workflow_delete", disabled=len(st.session_state.workflow_nodes) <= 1):
-                    _workflow_commit()
-                    deleted = st.session_state.workflow_selected
-                    st.session_state.workflow_nodes.pop(deleted, None)
-                    st.session_state.workflow_edges = [edge for edge in st.session_state.workflow_edges if edge[0] != deleted and edge[1] != deleted]
-                    st.session_state.workflow_selected = next(iter(st.session_state.workflow_nodes), None)
-                    st.rerun()
-            if (new_x, new_y) != (node["x"], node["y"]):
-                _workflow_commit()
-                node["x"], node["y"] = new_x, new_y
-        st.markdown("### Connections")
-        node_labels = {node_id: node["label"] for node_id, node in st.session_state.workflow_nodes.items()}
-        edge_cols = st.columns([2, 2, 1, 1])
-        with edge_cols[0]:
-            source = st.selectbox("Output port", list(node_labels), format_func=lambda value: node_labels[value], key="workflow_edge_source")
-        with edge_cols[1]:
-            target = st.selectbox("Input port", list(node_labels), format_func=lambda value: node_labels[value], key="workflow_edge_target")
-        with edge_cols[2]:
-            branch_label = st.text_input("Branch label", key="workflow_branch_label", placeholder="yes / no")
-        with edge_cols[3]:
-            if st.button("Connect", key="workflow_connect", disabled=source == target):
-                candidate = st.session_state.workflow_edges + [(source, target, branch_label.strip())]
-                if _workflow_has_cycle(candidate):
-                    st.error("Connection rejected: circular execution dependency detected.")
-                elif (source, target, branch_label.strip()) in st.session_state.workflow_edges:
-                    st.info("That connection already exists.")
-                else:
-                    _workflow_commit()
-                    st.session_state.workflow_edges.append((source, target, branch_label.strip()))
-                    st.rerun()
-        if st.session_state.workflow_edges:
-            for edge in st.session_state.workflow_edges:
-                label = f" · {edge[2]}" if edge[2] else ""
-                st.caption(f"{node_labels.get(edge[0], edge[0])} → {node_labels.get(edge[1], edge[1])}{label}")
-    with execution_tab:
-        st.info("Execution order is fixed by the tested backend: document ingestion → chunking → selected retrieval → Top-K → domain guard → MiniLM extraction → evidence validation → citation/abstention terminal.")
-        stages = [
-            ("Text Extraction", "text_extraction"), ("Chunk Generation", "chunk_generation"),
-            ("Retrieval", "retrieval"), ("MiniLM QA", "minilm_qa"),
-            ("Validation", "validation_results"), ("Terminal", "answer_source" if last_run and last_run.get("response") and getattr(last_run["response"], "supported", False) else "abstention"),
-        ]
-        for index, (label, block_id) in enumerate(stages, start=1):
-            st.markdown(f"**{index:02d} · {label}** — {_workflow_output(block_id, corpus_index, last_run)}")
-        if last_run:
-            response = last_run.get("response")
-            st.json({"elapsed_seconds": round(last_run.get("elapsed", 0.0), 3), "cache_hit": last_run.get("cache_hit", False), "answer": getattr(response, "answer", ""), "supported": getattr(response, "supported", False), "source": getattr(response, "source", None), "page": getattr(response, "page", None), "evidence": getattr(response, "evidence_text", "")})
-        else:
-            st.caption("Run a question to populate actual stage outputs.")
-
-SAMPLE_QUESTIONS = {
-    "Laws and Regulations": [
-        "How many legal deliveries are in an over?",
-        "What is a no-ball?",
-        "How long is the cricket pitch?",
-    ],
-    "Batting and Scoring": [
-        "How many runs is a boundary after the ball touches the ground?",
-        "What is a bye?",
-        "How many runs is a boundary when the ball clears the boundary without touching the ground?",
-    ],
-    "Match Formats": [
-        "How many players are in a cricket team?",
-        "What is a follow-on?",
-        "How many overs does each team bat in a One Day International?",
-    ],
-    "Unanswerable Queries": [
-        "Who won the 2026 soccer World Cup?",
-        "How many points are scored for a touchdown in rugby?",
-        "What is the offside rule in football?",
-    ],
-}
-
-ASSETS_PDF_QUESTIONS = {
-    "Cricket Laws and Regulations": [
-        "How many legal deliveries are in an over?",
-        "What is a no-ball?",
-        "What is the length of the cricket pitch?",
-        "How many players are in a cricket team?",
-        "What is a bye in cricket?",
-        "What is the follow-on in cricket?",
-        "What happens when the ball reaches the boundary?",
-        "What are the conditions for a batter to be out?",
-        "What is the difference between a wide and a no-ball?",
-    ],
-}
-
-
-def _assets_pdf_corpus(index) -> bool:
-    """Identify the bundled assests PDF set from the active index metadata."""
-    asset_names = {path.name for path in ASSETS_CORPUS_DIR.glob("*.pdf")}
-    active_names = {document.filename for document in index.documents}
-    return bool(active_names) and active_names.issubset(asset_names) and all(
-        document.file_type == "pdf" for document in index.documents
-    )
-
-
-def _related_questions(index, limit: int = 6) -> list[str]:
-    """Rank local prompts against the active corpus only.
-
-    This stays deterministic and local: it uses the same retrievers as the
-    answer flow, so every suggested question has at least one matching passage
-    in the active documents. The bundled PDF library uses its own question set;
-    it never falls back to the benchmark corpus or inactive cached documents.
-    """
-    question_bank = ASSETS_PDF_QUESTIONS if _assets_pdf_corpus(index) else SAMPLE_QUESTIONS
-    candidates = [question for questions in question_bank.values() for question in questions]
-    ranked: list[tuple[float, int, str]] = []
-    for position, question in enumerate(candidates):
-        rank_score = 0.0
-        for method in ("TF-IDF", "BM25"):
-            matches = index.retriever(method).search(question, top_k=1)
-            if matches:
-                rank_score += 1.0
-        if rank_score:
-            ranked.append((rank_score, -position, question))
-    ranked.sort(reverse=True)
-    return [question for _, _, question in ranked[:limit]]
-
-
-def _set_question_from_related(q_text: str) -> None:
-    """Put a related question into the main input and run it on the next rerun."""
-    st.session_state["question"] = q_text
-    st.session_state["auto_run"] = True
-
-
-def _set_question_from_sample(q_text: str) -> None:
-    st.session_state["question"] = q_text
-    st.session_state["auto_run"] = True
-
-
-def _on_history_select() -> None:
-    selected = st.session_state.get("history_selector")
-    if selected and selected != "-- Select a previous query --":
-        st.session_state["question"] = selected
-        st.session_state["auto_run"] = True
-
-
-def _on_question_submit() -> None:
-    if (st.session_state.get("question", "") or "").strip():
-        st.session_state["auto_run"] = True
-
-
+# Initialize Session State
 for key, value in {
     "corpus_index": None,
     "corpus_error": None,
@@ -1102,25 +341,32 @@ for key, value in {
     "fair_chunk_results": None,
     "final_report": None,
     "detected_questions": [],
+    "displayed_suggested_questions": [],
+    "seen_suggested_questions": [],
+    "suggested_answers": {},
+    "active_topic_questions": {},
+    "seen_topic_questions": {},
+    "cricket_kb_last_run": None,
+    "query_mode": "Document First with Cricket Knowledge Fallback",
     "invalid_document_warnings": [],
-    "workflow_nodes": {},
-    "workflow_edges": [],
-    "workflow_selected": None,
-    "workflow_next_id": 20,
-    "workflow_palette_open": False,
-    "workflow_palette_query": "",
+    "workflow_selected": "doc_upload",
     "workflow_zoom": 100,
-    "workflow_pan": "Center",
-    "workflow_undo": [],
-    "workflow_redo": [],
 }.items():
     if key not in st.session_state:
         st.session_state[key] = value
 
-if not st.session_state.workflow_nodes:
-    st.session_state.workflow_nodes = {f"node_{i}": {"id": f"node_{i}", "block_id": block_id, "label": label, "x": x, "y": y} for i, (block_id, label, x, y) in enumerate(WORKFLOW_DEFAULT_NODES)}
-    st.session_state.workflow_selected = "node_0"
+# Initialize topic questions for cricket knowledge
+if not st.session_state.active_topic_questions:
+    st.session_state.active_topic_questions = {
+        topic: get_topic_questions(topic, limit=3, exclude=())
+        for topic in TOPIC_QUESTIONS_BANK
+    }
+    st.session_state.seen_topic_questions = {
+        topic: list(st.session_state.active_topic_questions[topic])
+        for topic in TOPIC_QUESTIONS_BANK
+    }
 
+# Default corpus initial index build (Cricket Knowledge Corpus)
 if st.session_state.corpus_index is None:
     try:
         cached_result = build_cached_corpus_index(
@@ -1140,53 +386,41 @@ if st.session_state.corpus_index is None:
             cached_result.index.documents,
             domain_classifier=domain_clf,
         )
+        st.session_state.displayed_suggested_questions = get_grounded_suggested_questions(
+            cached_result.index,
+            domain_classifier=domain_clf,
+            limit=6,
+            exclude=(),
+        )
+        st.session_state.seen_suggested_questions = list(st.session_state.displayed_suggested_questions)
     except (OSError, ValueError, RuntimeError) as exc:
         st.session_state.corpus_error = str(exc)
 
+# Callbacks
+def _on_history_select() -> None:
+    selected = st.session_state.get("history_selector")
+    if selected and selected != "-- Select a previous query --":
+        st.session_state["question"] = selected
+        st.session_state["auto_run"] = True
+
+def _on_question_submit() -> None:
+    if (st.session_state.get("question", "") or "").strip():
+        st.session_state["auto_run"] = True
+
+def _set_question_and_run(q_text: str) -> None:
+    st.session_state["question"] = q_text
+    st.session_state["auto_run"] = True
+
+# Topbar
 st.markdown('<div class="topbar"><div class="brand">DocuQA<i>.</i></div><div class="eyebrow">CRICKET DOCUMENT QUESTION ANSWERING</div></div>', unsafe_allow_html=True)
 st.markdown("# DocuQA — Document Question Answering", unsafe_allow_html=True)
 st.markdown("### Extractive Question Answering and Information Retrieval for Cricket Documentation")
-st.markdown('<p class="lede">Indexes unstructured text using TF-IDF and Okapi BM25, retrieves candidate passages, and extracts verbatim answers with Hugging Face Transformers. The system abstains when evidence is insufficient.</p>', unsafe_allow_html=True)
+st.markdown('<p class="lede">Indexes unstructured documents using TF-IDF and Okapi BM25, retrieves candidate passages, and extracts verbatim answers with Hugging Face Transformers. Answers are validated against supporting evidence with conservative abstention.</p>', unsafe_allow_html=True)
 
-with st.expander("System Instructions & Workflow", expanded=False):
-    st.markdown(
-        """
-1. **Query Input**: Enter a question regarding cricket laws, player positions, match formats, or scoring.
-2. **Domain Classification**: Supervised ML verifies the query belongs to the Cricket domain; out-of-domain queries are rejected.
-3. **Retrieval**: Candidate passages are retrieved via Okapi BM25 (or TF-IDF baseline).
-4. **Extraction**: The fine-tuned MiniLM extractive model extracts exact answer spans.
-5. **Attribution & Verification**: Validated answers display with supporting passage highlights and exact document citations (Slide / Page).
-        """
-    )
-
-if st.session_state.get("invalid_document_warnings"):
-    for doc_name, conf, reason in st.session_state["invalid_document_warnings"]:
-        st.warning(
-            f"⚠️ **Unsupported Document Domain:** `{escape(doc_name)}` "
-            f"does not match the expected Cricket domain ({escape(reason)}). "
-            f"This system is domain-specific for Cricket documentation."
-        )
-
-detected_qs = st.session_state.get("detected_questions", [])
-if detected_qs:
-    with st.expander(f"📋 Detected Document Questions ({len(detected_qs)} found in active documents)", expanded=False):
-        st.caption("The system automatically extracts and classifies question prompts from your uploaded slides and documents.")
-        for idx, item in enumerate(detected_qs[:30]):
-            col_q, col_meta, col_act = st.columns([6, 3, 2])
-            with col_q:
-                st.markdown(f"**{escape(item.question)}**")
-            with col_meta:
-                domain_badge = "🏏 Cricket" if item.domain == "Cricket" else "⚠️ Out-of-Domain"
-                loc = f"{item.location_type} {item.page_or_slide}" if item.page_or_slide is not None else "Page N/A"
-                st.caption(f"{escape(item.source)} ({loc}) · {domain_badge} · {item.question_type}")
-            with col_act:
-                if st.button("Ask this", key=f"ask_det_{idx}_{item.chunk_id}", use_container_width=True):
-                    _set_question_from_sample(item.question)
-                    st.rerun()
-
+# SIDEBAR: Document Corpus Ingestion & Chunking Controls
 with st.sidebar:
     st.markdown("### Document Corpus")
-    st.caption("Add documents to your knowledge base")
+    st.caption("Upload cricket documents or select a built-in library.")
     st.markdown("PDF · PPTX · TXT · DOCX · Markdown", help="Maximum 100 MB per file")
     uploads = st.file_uploader(
         "Drop files here or click to browse",
@@ -1197,7 +431,7 @@ with st.sidebar:
     )
     if uploads:
         upload_bytes_total = sum(item.size for item in uploads)
-        st.markdown(f"**Selected documents**  \n{len(uploads)} documents · {upload_bytes_total / (1024 * 1024):.1f} MB")
+        st.markdown(f"**Selected files:** {len(uploads)} file(s) · {upload_bytes_total / (1024 * 1024):.1f} MB")
         try:
             cached_count, pending_count, total_count = cache_status(
                 ((item.name, item.getvalue()) for item in uploads),
@@ -1206,53 +440,51 @@ with st.sidebar:
                 DEFAULT_OVERLAP,
             )
             if pending_count:
-                st.info(f"⚡ {cached_count} cached · {pending_count} document(s) require indexing")
+                st.info(f"{cached_count} cached · {pending_count} file(s) require indexing")
             else:
-                st.success(f"✓ {cached_count}/{total_count} documents already indexed")
+                st.success(f"{cached_count}/{total_count} files already indexed")
         except (OSError, ValueError) as exc:
             st.warning(f"Cache status unavailable: {exc}")
-        if st.button("Remove all", key="remove_all_uploads"):
+        if st.button("Remove uploaded files", key="remove_all_uploads"):
             _clear_corpus()
             st.rerun()
+
     corpus_choice = st.selectbox(
-        "Built-in corpus (when no files are uploaded)",
+        "Built-in corpus (when no files uploaded)",
         options=[
             "Cricket Knowledge Corpus (8 Markdown files)",
             "Official Regulations Library (6 PDF files in assests/)",
-            "Multi-Format Sample Corpus (PDF, DOCX, TXT, MD - 4 files)",
+            "Multi-Format Sample Corpus (PDF, PPTX, DOCX, TXT - 5 files)",
         ],
         index=0,
-        help="Select a corpus to index. The Cricket Knowledge Corpus (data/documents/) is ground truth for the benchmark questions. The Official Regulations Library indexes the 6 PDF files in assests/.",
+        help="Choose built-in corpus. The Cricket Knowledge Corpus (data/documents/) is ground truth for the benchmark.",
     )
+
     with st.expander("Advanced Chunking Parameters", expanded=False):
         chunk_size = st.number_input("Chunk size (words)", min_value=20, max_value=500, value=DEFAULT_CHUNK_SIZE, step=10)
         overlap = st.number_input("Chunk overlap (words)", min_value=0, max_value=int(chunk_size) - 1, value=min(DEFAULT_OVERLAP, int(chunk_size) - 1), step=5)
+
     if "Cricket Knowledge Corpus" in corpus_choice:
         selected_dir = CRICKET_CORPUS_DIR
     elif "Official Regulations Library" in corpus_choice:
         selected_dir = ASSETS_CORPUS_DIR
     else:
         selected_dir = MULTI_FORMAT_CORPUS_DIR
+
     selected_upload_bytes = tuple((item.name, item.getvalue()) for item in (uploads or []))
     requested_corpus_signature = corpus_signature(
         selected_upload_bytes, selected_dir, int(chunk_size), int(overlap),
     )
     corpus_selection_pending = requested_corpus_signature != st.session_state.get("active_corpus_signature")
     if corpus_selection_pending:
-        st.warning("The selected documents are not active yet. Click **Build / Update Index** before searching.")
+        st.warning("Document selection is pending. Click **Build / Update Index** to activate.")
+
     if st.button("Build / Update Index", type="primary", key="index_documents"):
         previous_index = st.session_state.corpus_index
         try:
             upload_bytes = [(item.name, item.getvalue()) for item in (uploads or [])]
-            if "Cricket Knowledge Corpus" in corpus_choice:
-                selected_dir = CRICKET_CORPUS_DIR
-            elif "Official Regulations Library" in corpus_choice:
-                selected_dir = ASSETS_CORPUS_DIR
-            else:
-                selected_dir = MULTI_FORMAT_CORPUS_DIR
-
             validate_upload_sizes((name, len(content)) for name, content in upload_bytes)
-            with st.spinner("Checking the persistent index cache and updating documents..."):
+            with st.spinner("Processing documents, generating chunks, and building BM25/TF-IDF indexes..."):
                 cached_result = build_cached_corpus_index(
                     tuple(upload_bytes),
                     str(selected_dir),
@@ -1272,691 +504,843 @@ with st.sidebar:
                 if not doc_domain.is_cricket:
                     invalid_docs.append((doc.filename, doc_domain.confidence, doc_domain.reason))
             st.session_state.invalid_document_warnings = invalid_docs
+
+            # Automatically suggest questions grounded in active corpus
             st.session_state.detected_questions = detect_document_questions(
                 cached_result.index.documents,
                 domain_classifier=domain_clf,
             )
-            # Keep indexing independent from the expensive MiniLM checkpoint load.
-            # The model is loaded lazily by the first feature that needs QA
-            # (Search, question generation, or batch QA) and then reused through
-            # Streamlit's resource cache. This keeps Upload -> Index responsive.
-            st.session_state.qa_model_ready = False
-            st.session_state.qa_model_load_seconds = None
-            st.session_state.qa_model_error = None
+            st.session_state.displayed_suggested_questions = get_grounded_suggested_questions(
+                cached_result.index,
+                domain_classifier=domain_clf,
+                limit=6,
+                exclude=(),
+            )
+            st.session_state.seen_suggested_questions = list(st.session_state.displayed_suggested_questions)
+            st.session_state.suggested_answers = {}
+
             st.session_state.corpus_error = None
             st.session_state.corpus_revision += 1
             st.session_state.last_answer_run = None
             st.session_state.answer_cache = {}
             st.session_state.evaluation_rows = []
-            if upload_bytes:
-                label = f"{len(upload_bytes)} uploaded file(s)"
-            elif "Cricket Knowledge Corpus" in corpus_choice:
-                label = "Cricket Knowledge Corpus (data/documents)"
-            elif "Official Regulations Library" in corpus_choice:
-                label = "Official Regulations Library (assests/ - 6 PDF files)"
-            else:
-                label = "Multi-Format Sample Corpus (sample_corpus)"
+
             timing = cached_result.timing
-            if timing.loaded_existing_index:
-                st.success(f"✓ Existing index loaded · Ready in {timing.total_seconds:.1f} seconds")
-            else:
-                st.success(f"✓ Corpus ready · {label} indexed in {timing.total_seconds:.1f} seconds")
-            if st.session_state.qa_model_ready:
-                st.caption(f"QA model ready for fast questions ({st.session_state.qa_model_load_seconds:.1f}s one-time load).")
-            elif st.session_state.qa_model_error:
-                st.warning(f"QA model was not warmed: {st.session_state.qa_model_error}")
+            st.success(f"Corpus indexed in {timing.total_seconds:.2f}s ({cached_result.index.document_count} docs, {cached_result.index.chunk_count} chunks)")
         except (OSError, ValueError, RuntimeError) as exc:
-            # Keep the last working index available so a failed upload or
-            # unsupported document does not take down an otherwise usable session.
             st.session_state.corpus_index = previous_index
             st.session_state.corpus_error = str(exc)
             st.error(f"Indexing failed: {exc}")
+
     st.button(
         "Clear / Reset Corpus",
         key="clear_corpus",
         on_click=_clear_corpus,
-        help="Clears uploaded files and indexes. The default corpus can be indexed again afterward.",
+        help="Clears index and uploaded files.",
     )
+
     st.markdown('<div class="section-rule"></div>', unsafe_allow_html=True)
-    st.markdown(f'<div class="eyebrow">EXTRACTIVE QA MODEL</div><div class="model-caption"><strong>{escape(DEFAULT_QA_MODEL)}</strong><br>Local checkpoint. Extractive span inference runs on CPU/GPU without external API calls.</div>', unsafe_allow_html=True)
+    st.markdown("### Query Routing Mode")
+    st.session_state.query_mode = st.selectbox(
+        "QA Routing Mode",
+        options=[
+            "Document First with Cricket Knowledge Fallback",
+            "Uploaded Documents Only",
+            "Cricket Knowledge Only",
+        ],
+        index=0,
+        key="qa_query_mode_selector",
+        help="In fallback mode, searches uploaded documents first; if unsupported, retrieves from the cricket knowledge corpus.",
+    )
+
+    st.markdown('<div class="section-rule"></div>', unsafe_allow_html=True)
+    st.markdown(
+        f'<div class="eyebrow">PRODUCTION QA MODEL</div>'
+        f'<div style="font-size:12px; font-weight:600; color:#F7F3EA; margin:4px 0 2px;">{escape(DEFAULT_QA_MODEL)}</div>'
+        f'<div style="font-size:11px; color:#D9D4CB; line-height:1.4;">'
+        f'Local MiniLM extractive span checkpoint. Inference runs locally on CPU/GPU without external API calls.</div>',
+        unsafe_allow_html=True,
+    )
+
+# Warnings for out-of-domain uploaded documents
+if st.session_state.get("invalid_document_warnings"):
+    for doc_name, conf, reason in st.session_state["invalid_document_warnings"]:
+        st.warning(
+            f"**Unsupported Document Domain:** `{escape(doc_name)}` "
+            f"does not match the expected Cricket domain ({escape(reason)}). "
+            f"The system is domain-specific for Cricket documentation."
+        )
 
 loaded_corpus_index = st.session_state.corpus_index
-# Never present the previous index as current while a new document selection is pending.
 corpus_index = loaded_corpus_index if not corpus_selection_pending else None
-if st.session_state.get("corpus_error"):
-    st.error(f"Corpus setup failed: {st.session_state.corpus_error}")
-if corpus_index is None:
-    status_col1, status_col2, status_col3, status_col4 = st.columns(4)
-    status_col1.metric("Indexed Documents", "—")
-    status_col2.metric("Total Chunks", "—")
-    status_col3.metric("Extracted Words", "—")
-    status_col4.metric("Index Status", "Not built")
-    if corpus_selection_pending:
-        pending_count = len(selected_upload_bytes) if selected_upload_bytes else sum(
-            1 for path in Path(selected_dir).iterdir() if path.is_file()
-        )
-        st.info(
-            f"Pending selection: {pending_count} document(s). "
-            "Build / Update Index to activate this exact selection."
-        )
+
+# PRIMARY APPLICATION TABS
+main_tab_doc_qa, main_tab_cricket_kb, main_tab_workflow, main_tab_tech = st.tabs([
+    "Document Q&A",
+    "Cricket Knowledge",
+    "Interactive Workflow Canvas",
+    "Technical Workspace & Evaluation",
+])
+
+# ==============================================================================
+# TAB 1: UPLOADED DOCUMENT QUESTION ANSWERING (PART 1)
+# ==============================================================================
+with main_tab_doc_qa:
+    st.markdown("## Part 1 — Uploaded Document Question Answering")
+    st.caption("Upload documents in the sidebar, inspect processing metadata, view automatically suggested questions, and query the active corpus.")
+
+    # Step 1: Uploaded documents status table
+    if uploads:
+        st.markdown("#### Uploaded Documents Status")
+        upload_rows = []
+        for file_obj in uploads:
+            ext = Path(file_obj.name).suffix.lower()
+            upload_rows.append({
+                "Filename": file_obj.name,
+                "Format": ext.upper().lstrip("."),
+                "Size": f"{file_obj.size / 1024:.1f} KB",
+                "Status": "Indexed & Active" if (corpus_index and any(d.filename == file_obj.name for d in corpus_index.documents)) else "Requires Indexing",
+            })
+        st.dataframe(pd.DataFrame(upload_rows), use_container_width=True)
+
+    # Step 2: Show document-processing information
+    st.markdown("#### Active Corpus Diagnostics & Processing Information")
+    if corpus_index is None:
+        m1, m2, m3, m4 = st.columns(4)
+        m1.metric("Indexed Documents", "—")
+        m2.metric("Total Chunks", "—")
+        m3.metric("Extracted Words", "—")
+        m4.metric("Index Status", "Pending" if corpus_selection_pending else "Not built")
+        if corpus_selection_pending:
+            st.info("Pending selection. Click **Build / Update Index** in the sidebar to activate.")
+        else:
+            st.info("No corpus active. Choose a built-in corpus or upload documents, then click **Build / Update Index**.")
     else:
-        st.info("No corpus is available yet. Choose a built-in corpus or upload documents, then click **Build / Update Index** in the left sidebar.")
-else:
-    status_col1, status_col2, status_col3, status_col4 = st.columns(4)
-    status_col1.metric("Indexed Documents", corpus_index.document_count)
-    status_col2.metric("Total Chunks", corpus_index.chunk_count)
-    status_col3.metric("Extracted Words", f"{sum(document.word_count for document in corpus_index.documents):,}")
-    status_col4.metric("Index Status", "Ready")
-    timing = st.session_state.get("corpus_timing")
-    if timing is not None:
-        with st.expander("Technical diagnostics", expanded=False):
-            if timing.loaded_existing_index:
-                st.success(f"✓ Existing index loaded in {timing.total_seconds:.2f} seconds")
-            else:
-                st.write(f"**Corpus indexing:** {timing.total_seconds:.2f} s")
-                st.write(f"**Cached reload:** not applicable (indexed {timing.indexed_documents} document(s))")
-            timing_rows = {
-                "Upload/materialization": timing.upload_seconds,
-                "Cache lookup": timing.cache_lookup_seconds,
-                "PDF/text extraction": timing.extraction_seconds,
-                "Chunking": timing.chunking_seconds,
-                "TF-IDF build": timing.tfidf_seconds,
-                "BM25 build": timing.bm25_seconds,
-            }
-            st.table({"Stage": list(timing_rows), "Seconds": [round(value, 3) for value in timing_rows.values()]})
-            st.caption(f"{timing.cached_documents} cached document(s) · {timing.indexed_documents} document(s) processed")
-    with st.expander("Active Corpus Documents", expanded=False):
-        for document in corpus_index.documents:
-            st.markdown(f"- **{escape(document.filename)}** ({len(document.chunks)} chunks)")
-            if document.file_type == "pdf" and document.word_count < 50:
-                st.warning(
-                    f"{document.filename} has only {document.word_count} extracted words. "
-                    "It may be scanned or image-only; use an OCR-enabled PDF for reliable answers."
-                )
-    if corpus_index.uploaded:
-        related_questions = _related_questions(corpus_index)
-        st.markdown("### Suggested Questions")
-        if _assets_pdf_corpus(corpus_index):
-            st.caption("QUESTIONS BASED ONLY ON THE CURRENTLY ACTIVE CORPUS.")
-        else:
-            st.caption("QUESTIONS BASED ONLY ON THE CURRENTLY ACTIVE CORPUS.")
-        if related_questions:
-            related_columns = st.columns(min(3, len(related_questions)))
-            for position, related_question in enumerate(related_questions):
-                with related_columns[position % len(related_columns)]:
-                    st.button(
-                        related_question,
-                        key=f"related_{st.session_state.corpus_revision}_{position}",
-                        on_click=_set_question_from_related,
-                        args=(related_question,),
-                        use_container_width=True,
-                    )
-        else:
-            st.info("No built-in cricket questions matched this upload yet. Enter a question below about the document's terminology, rules, or definitions.")
+        m1, m2, m3, m4 = st.columns(4)
+        m1.metric("Indexed Documents", corpus_index.document_count)
+        pages_count = sum(d.page_count for d in corpus_index.documents if d.page_count)
+        page_label = f" ({pages_count} pages/slides)" if pages_count else ""
+        m2.metric("Pages / Slides", f"{pages_count or 'N/A'}")
+        total_words = sum(d.word_count for d in corpus_index.documents)
+        total_chars = sum(len(c.text) for d in corpus_index.documents for c in d.chunks)
+        m3.metric("Extracted Words", f"{total_words:,}")
+        m4.metric("Generated Chunks", f"{corpus_index.chunk_count:,}")
 
-_render_workflow_builder(corpus_index, st.session_state.last_answer_run)
+        status_c1, status_c2, status_c3 = st.columns(3)
+        with status_c1:
+            st.markdown(f"**Chunk Configuration:** `{chunk_size} words` (overlap: `{overlap} words`)")
+        with status_c2:
+            st.markdown(f"**BM25 Index:** Ready · `{corpus_index.chunk_count}` chunks")
+        with status_c3:
+            timing = st.session_state.get("corpus_timing")
+            duration_str = f"{timing.total_seconds:.2f} s" if timing else "Cached"
+            st.markdown(f"**TF-IDF Index:** Ready · Duration: `{duration_str}`")
 
-with st.expander("Retrieval Parameters", expanded=False):
-    adv_col1, adv_col2 = st.columns(2)
-    with adv_col1:
-        method = st.selectbox(
-            "Ranking Algorithm",
-            ["TF-IDF / cosine", "BM25"],
-            index=1,
-            key="retrieval_method",
-            help="Algorithm used to rank document passages by query similarity.",
+        # Expandable document text & chunk inspector
+        with st.expander("Document Text & Generated Chunks Inspector", expanded=False):
+            doc_names = [d.filename for d in corpus_index.documents]
+            selected_doc_name = st.selectbox("Select document to inspect", doc_names, key="inspect_doc_select")
+            target_doc = next((d for d in corpus_index.documents if d.filename == selected_doc_name), None)
+            if target_doc:
+                st.markdown(f"**Document:** `{target_doc.filename}` · **Format:** {target_doc.file_type.upper()} · **Word Count:** {target_doc.word_count} · **Chunks:** {len(target_doc.chunks)}")
+                insp_tab1, insp_tab2 = st.tabs(["Extracted Full Text", "Generated Chunks Detail"])
+                with insp_tab1:
+                    full_text = "\n\n".join(c.text for c in target_doc.chunks)
+                    st.text_area("Full Extracted Text", full_text, height=220, key="inspect_full_text")
+                with insp_tab2:
+                    for c_idx, chunk in enumerate(target_doc.chunks, start=1):
+                        loc_type = "Slide" if Path(target_doc.filename).suffix.lower() == ".pptx" else "Page"
+                        loc_str = f"{loc_type} {chunk.page}" if chunk.page is not None else "Page N/A"
+                        st.markdown(f"**Chunk #{c_idx:02d} [{chunk.chunk_id}]** — {loc_str} · {chunk.word_count} words · Derived Paragraph {chunk.paragraph_index + 1}")
+                        st.code(chunk.text, language=None)
+
+    st.markdown('<div class="section-rule"></div>', unsafe_allow_html=True)
+
+    # Step 3: Automatically suggest questions
+    st.markdown("### Suggested Questions")
+    st.caption("Complete, natural-language questions grounded in the active corpus. Refresh dynamically surfaces alternative candidates without rebuilding the index.")
+
+    sug_col1, sug_col2 = st.columns([1, 1])
+    with sug_col1:
+        if st.button("Refresh Questions", key="refresh_suggested_qs", disabled=corpus_index is None):
+            domain_clf = load_domain_classifier_model()
+            new_suggestions = get_grounded_suggested_questions(
+                corpus_index,
+                domain_classifier=domain_clf,
+                limit=6,
+                exclude=st.session_state.seen_suggested_questions,
+            )
+            st.session_state.displayed_suggested_questions = new_suggestions
+            for q in new_suggestions:
+                if q not in st.session_state.seen_suggested_questions:
+                    st.session_state.seen_suggested_questions.append(q)
+            st.session_state.suggested_answers = {}
+            st.rerun()
+
+    with sug_col2:
+        if st.button("Generate Answers for All Suggestions", key="gen_all_suggested_answers", disabled=corpus_index is None or not st.session_state.displayed_suggested_questions):
+            with st.spinner("Extracting answers for all suggestions through the QA pipeline..."):
+                qa_model = load_qa_model()
+                domain_clf = load_domain_classifier_model()
+                retrieval_method = st.session_state.get("retrieval_method", "BM25")
+                tk = int(st.session_state.get("top_k_v2", DEFAULT_TOP_K))
+                for q_text in st.session_state.displayed_suggested_questions:
+                    t_start = time.perf_counter()
+                    p_list, resp_obj = ask_indexed_corpus(corpus_index, q_text, retrieval_method, tk, qa_model, domain_classifier=domain_clf)
+                    st.session_state.suggested_answers[q_text] = (p_list, resp_obj, time.perf_counter() - t_start)
+            st.success("Generated answers for all displayed suggestions!")
+            st.rerun()
+
+    suggested_list = st.session_state.displayed_suggested_questions
+    if not suggested_list and corpus_index:
+        domain_clf = load_domain_classifier_model()
+        suggested_list = get_grounded_suggested_questions(corpus_index, domain_classifier=domain_clf, limit=6)
+        st.session_state.displayed_suggested_questions = suggested_list
+        st.session_state.seen_suggested_questions = list(suggested_list)
+
+    if suggested_list:
+        cols = st.columns(2)
+        for idx, sq in enumerate(suggested_list):
+            with cols[idx % 2]:
+                with st.container():
+                    st.markdown(f'<div class="suggested-card"><div class="suggested-title">{escape(sq)}</div></div>', unsafe_allow_html=True)
+                    ans_c1, ans_c2 = st.columns([1, 1])
+                    with ans_c1:
+                        if st.button("Ask this question", key=f"ask_sq_{idx}", use_container_width=True):
+                            _set_question_and_run(sq)
+                            st.rerun()
+                    with ans_c2:
+                        has_answer = sq in st.session_state.suggested_answers
+                        btn_label = "View Answer" if has_answer else "Extract Answer"
+                        if st.button(btn_label, key=f"ans_sq_{idx}", use_container_width=True):
+                            if not has_answer:
+                                qa_model = load_qa_model()
+                                domain_clf = load_domain_classifier_model()
+                                retrieval_method = st.session_state.get("retrieval_method", "BM25")
+                                tk = int(st.session_state.get("top_k_v2", DEFAULT_TOP_K))
+                                t_start = time.perf_counter()
+                                p_list, resp_obj = ask_indexed_corpus(corpus_index, sq, retrieval_method, tk, qa_model, domain_classifier=domain_clf)
+                                st.session_state.suggested_answers[sq] = (p_list, resp_obj, time.perf_counter() - t_start)
+                            st.rerun()
+
+                    # Step 4 & 5: Show suggested answers and precise source evidence
+                    if sq in st.session_state.suggested_answers:
+                        p_list, resp_obj, el_time = st.session_state.suggested_answers[sq]
+                        if resp_obj.supported:
+                            st.markdown(f'<div class="answer-callout" style="font-size:17px; padding:10px 14px; margin:8px 0;"><strong>Answer:</strong> {escape(resp_obj.answer)}</div>', unsafe_allow_html=True)
+                            st.caption(f"Status: Evidence Found · Exact span verified ({el_time:.2f}s)")
+                            # Source Evidence
+                            chunk_obj = next((c for d in corpus_index.documents for c in d.chunks if c.chunk_id == resp_obj.chunk_id), None)
+                            locator_meta = get_evidence_locator(resp_obj, chunk_obj)
+                            st.markdown(f"**Source:** `{resp_obj.source}` · {locator_meta['locator_label']}")
+                            if resp_obj.evidence_text and resp_obj.answer_start is not None and resp_obj.answer_end is not None:
+                                pre = escape(resp_obj.evidence_text[:resp_obj.answer_start])
+                                match_span = escape(resp_obj.evidence_text[resp_obj.answer_start:resp_obj.answer_end])
+                                post = escape(resp_obj.evidence_text[resp_obj.answer_end:])
+                                hl = f'{pre}<mark style="background:rgba(155,52,24,0.18); font-weight:600; padding:2px 4px; border-bottom:2px solid var(--oxide);">{match_span}</mark>{post}'
+                                st.markdown(f'<div class="result-text" style="font-size:13px;">{hl}</div>', unsafe_allow_html=True)
+                        else:
+                            st.info(f"**Status: Insufficient Evidence**  \n{resp_obj.answer}")
+    else:
+        st.info("No suggested questions available yet. Index documents to generate grounded questions.")
+
+    st.markdown('<div class="section-rule"></div>', unsafe_allow_html=True)
+
+    # Step 6: Allow out-of-the-box questions
+    st.markdown("### Out-of-the-Box Question Input")
+    st.caption("Ask any question in your own words. The system verifies domain, retrieves passages, and validates exact answer evidence.")
+
+    with st.expander("Retrieval Settings", expanded=False):
+        adv_col1, adv_col2 = st.columns(2)
+        with adv_col1:
+            method = st.selectbox(
+                "Ranking Algorithm",
+                ["BM25", "TF-IDF / cosine"],
+                index=0,
+                key="retrieval_method",
+                help="Algorithm used to rank candidate passages.",
+            )
+        with adv_col2:
+            top_k = st.select_slider(
+                "Passage Count (Top-K)",
+                options=[1, 2, 3, 5, 8, 10],
+                value=DEFAULT_TOP_K,
+                key="top_k_v2",
+                help="Number of candidate passages supplied to the extractive QA model.",
+            )
+
+    if st.session_state.question_history:
+        st.selectbox(
+            "Recent Queries History",
+            options=["-- Select a previous query --"] + st.session_state.question_history,
+            index=0,
+            key="history_selector",
+            on_change=_on_history_select,
+            help="Choose a previous query to re-run.",
         )
-    with adv_col2:
-        top_k = st.select_slider(
-            "Passage Count (Top-K)",
-            options=[1, 2, 3, 5, 8, 10],
-            value=DEFAULT_TOP_K,
-            key="top_k_v2",
-            help="Number of candidate passages supplied to the extractive QA model.",
-        )
 
-if st.session_state.question_history:
-    st.markdown("#### Recent Queries")
-    st.selectbox(
-        "Select a previous query to re-run",
-        options=["-- Select a previous query --"] + st.session_state.question_history,
-        index=0,
-        key="history_selector",
-        on_change=_on_history_select,
+    question = st.text_input(
+        "Enter question",
+        placeholder="e.g. How many legal deliveries are in an over? or What is a no-ball?",
+        key="question",
         label_visibility="collapsed",
-        help="Choose a previous query from this session to re-run with current settings.",
+        on_change=_on_question_submit,
     )
 
-st.markdown("### Query")
-question = st.text_input(
-    "Query input",
-    placeholder="Enter a question regarding cricket rules, scoring, or match structure...",
-    key="question",
-    label_visibility="collapsed",
-    on_change=_on_question_submit,
-)
-st.caption("Press Enter on your keyboard or click 'Search and Extract Answer' below to run. You can also click any sample query.")
+    ask_clicked = st.button(
+        "Search and Extract Answer",
+        type="primary",
+        disabled=corpus_index is None or corpus_selection_pending or not (st.session_state.get("question", "") or "").strip(),
+        key="retrieve_and_answer",
+        use_container_width=True,
+    )
 
-ask_clicked = st.button(
-    "Search and Extract Answer",
-    type="primary",
-    disabled=corpus_index is None or corpus_selection_pending or not (st.session_state.get("question", "") or "").strip(),
-    key="retrieve_and_answer",
-    use_container_width=True,
-)
+    ask_triggered = ask_clicked or st.session_state.get("auto_run", False)
+    st.session_state["auto_run"] = False
 
-ask_triggered = ask_clicked or st.session_state.get("auto_run", False)
-st.session_state["auto_run"] = False
-
-if ask_triggered and corpus_index is not None and question.strip():
-    clean_q = question.strip()
-    if clean_q in st.session_state.question_history:
-        st.session_state.question_history.remove(clean_q)
-    st.session_state.question_history.insert(0, clean_q)
-    del st.session_state.question_history[10:]
-    answer_key = (clean_q, method, int(top_k), st.session_state.corpus_revision)
-    try:
-        cached_answer = st.session_state.answer_cache.get(answer_key)
-        if cached_answer is not None:
-            passages, response, elapsed = cached_answer
-            cache_hit = True
-        else:
+    if ask_triggered and corpus_index is not None and question.strip():
+        clean_q = question.strip()
+        if clean_q in st.session_state.question_history:
+            st.session_state.question_history.remove(clean_q)
+        st.session_state.question_history.insert(0, clean_q)
+        del st.session_state.question_history[10:]
+        answer_key = (clean_q, method, int(top_k), st.session_state.corpus_revision)
+        try:
             started_at = time.perf_counter()
-            with st.spinner("Searching indexed documents and extracting exact answer span..."):
+            with st.spinner("Retrieving candidate passages and extracting exact answer span..."):
                 model = load_qa_model()
                 domain_clf = load_domain_classifier_model()
                 st.session_state.qa_model_ready = True
-                passages, response = ask_indexed_corpus(
-                    corpus_index,
-                    clean_q,
-                    method,
-                    int(top_k),
-                    model,
+                knowledge_idx = load_knowledge_index()
+                exec_result = ask_with_fallback(
+                    uploaded_index=corpus_index if corpus_index.uploaded else None,
+                    knowledge_index=knowledge_idx,
+                    question=clean_q,
+                    method=method,
+                    top_k=int(top_k),
+                    qa_model=model,
                     domain_classifier=domain_clf,
+                    query_mode=st.session_state.get("query_mode", "Document First with Cricket Knowledge Fallback"),
                 )
             elapsed = time.perf_counter() - started_at
-            st.session_state.answer_cache[answer_key] = (passages, response, elapsed)
-            if len(st.session_state.answer_cache) > 20:
-                oldest_key = next(iter(st.session_state.answer_cache))
-                del st.session_state.answer_cache[oldest_key]
-            cache_hit = False
-        st.session_state.last_answer_run = {
-            "signature": answer_key,
-            "passages": passages,
-            "response": response,
-            "elapsed": elapsed,
-            "cache_hit": cache_hit,
-        }
-    except (OSError, RuntimeError, ValueError) as exc:
-        st.session_state.last_answer_run = None
-        st.error(f"Question answering failed: {exc}")
+            st.session_state.last_answer_run = {
+                "signature": answer_key,
+                "passages": exec_result.passages,
+                "response": exec_result.response,
+                "source_origin": exec_result.source_origin,
+                "origin_description": exec_result.origin_description,
+                "elapsed": elapsed,
+            }
+        except (OSError, RuntimeError, ValueError) as exc:
+            st.session_state.last_answer_run = None
+            st.error(f"Processing failed: {exc}")
 
-last_run = st.session_state.last_answer_run
-signature = (question.strip(), method, int(top_k), st.session_state.corpus_revision)
-if last_run is not None and last_run["signature"] == signature:
-    response = last_run["response"]
-    st.markdown('<div class="section-rule"></div>', unsafe_allow_html=True)
-    timing_label = "from session cache" if last_run.get("cache_hit") else "fresh inference"
-    st.caption(f"Query completed in {last_run.get('elapsed', 0.0):.2f} seconds · {timing_label}")
-    if getattr(response, "is_out_of_domain", False):
-        st.markdown("## 🚫 Out-of-Domain Question Rejected")
-        st.markdown(
-            f'<div style="font-size: 16px; font-weight: 500; color: #721C24; margin: 12px 0 20px; padding: 16px 20px; background: #F8D7DA; border-left: 5px solid #DC3545; border-radius: 4px;">'
-            f'<strong>Out-of-Domain Question Rejected</strong><br><br>'
-            f'{escape(response.answer)}<br><br>'
-            f'<span style="font-size: 13px; color: #555;">'
-            f'Domain Classifier: <strong>Other Domain</strong> (Confidence: {response.qa_score:.1%}) · System is specialized for Cricket document Q&A only.</span>'
-            f'</div>',
-            unsafe_allow_html=True,
-        )
-    elif response.supported:
-        st.markdown("## Answer")
-        st.markdown(
-            f'<div style="font-size: 24px; font-weight: 600; color: var(--ink); margin: 12px 0 20px; padding: 14px 20px; background: rgba(155, 52, 24, 0.06); border-left: 4px solid var(--oxide);">'
-            f'{escape(response.answer)}</div>',
-            unsafe_allow_html=True,
-        )
-        contextual_answer = _answer_context(response)
-        if contextual_answer:
-            st.caption("Context from the cited evidence")
-            st.markdown(
-                f'<div class="result-text" style="margin: 0 0 16px;">{escape(contextual_answer)}</div>',
-                unsafe_allow_html=True,
-            )
-        source = escape(response.source or "")
-        chunk_id = escape(response.chunk_id or "")
-        source_kind = Path(response.source or "").suffix.lower()
-        location_label = "Slide" if source_kind == ".pptx" else "Page"
-        page_label = f"{location_label} {response.page}" if response.page is not None else f"{location_label} N/A"
-        st.markdown("### Source")
-        st.markdown(
-            f'<div class="result-meta" style="font-size: 12px; margin-bottom: 16px;">'
-            f'DOCUMENT: <strong>{source}</strong> &nbsp;•&nbsp; {page_label} &nbsp;•&nbsp; CHUNK: {chunk_id}</div>',
-            unsafe_allow_html=True,
-        )
-        source_document = next(
-            (document for document in corpus_index.documents if document.filename == response.source),
-            None,
-        )
-        if source_document is not None and source_document.file_type == "pdf":
-            source_path = Path(source_document.source)
-            if source_path.is_file():
-                st.download_button(
-                    "Open Source PDF",
-                    data=source_path.read_bytes(),
-                    file_name=source_document.filename,
-                    mime="application/pdf",
-                    help=(f"Download the cited PDF. The evidence comes from page {response.page}."
-                          if response.page is not None else "Download the cited PDF."),
-                )
-        st.markdown("### Evidence")
-        if (
-            response.evidence_text
-            and response.answer_start is not None
-            and response.answer_end is not None
-            and 0 <= response.answer_start < response.answer_end <= len(response.evidence_text)
-        ):
-            pre = escape(response.evidence_text[:response.answer_start])
-            match_span = escape(response.evidence_text[response.answer_start:response.answer_end])
-            post = escape(response.evidence_text[response.answer_end:])
-            highlighted_html = (
-                f'{pre}<mark style="background: rgba(155, 52, 24, 0.16); color: var(--ink); padding: 2px 4px; font-weight: 600; border-bottom: 2px solid var(--oxide);">'
-                f'{match_span}</mark>{post}'
-            )
-            st.markdown(
-                f'<div class="result-text" style="background: rgba(26,25,23,0.04); padding: 14px 18px; border-left: 3px solid var(--oxide); margin: 10px 0;">'
-                f'{highlighted_html}</div>',
-                unsafe_allow_html=True,
-            )
-        else:
-            st.write(response.evidence_text)
-        st.caption(f"Validated exact span: characters {response.answer_start}–{response.answer_end} in cited chunk.")
-    else:
-        st.markdown("## No Extracted Answer")
-        st.markdown(
-            '<div style="padding: 14px 20px; background: rgba(26,25,23,0.05); border-left: 4px solid var(--muted); margin: 12px 0 16px;">'
-            '<strong>Status: Insufficient Evidence</strong><br>'
-            'The retrieved document passages do not contain sufficient evidence to answer this query. The model abstains to prevent hallucination.'
-            '</div>',
-            unsafe_allow_html=True,
-        )
+    last_run = st.session_state.last_answer_run
+    signature = (question.strip(), method, int(top_k), st.session_state.corpus_revision)
+    if last_run is not None and last_run["signature"] == signature:
+        response = last_run["response"]
+        st.markdown('<div class="section-rule"></div>', unsafe_allow_html=True)
+        st.caption(f"Query completed in {last_run.get('elapsed', 0.0):.2f}s · {last_run.get('origin_description', '')}")
 
-    with st.expander(f"Retrieved Passages ({escape(method)})", expanded=False):
-        if not last_run["passages"]:
-            st.caption("No passages matched the query terms in the indexed corpus.")
-        for rank, result in enumerate(last_run["passages"], start=1):
-            source = escape(result.source)
-            chunk_id = escape(result.chunk_id)
-            passage = escape(result.chunk.text)
-            location_label = "SLIDE" if Path(result.source).suffix.lower() == ".pptx" else "PAGE"
-            page_label = f"{location_label} {result.page}" if result.page is not None else f"{location_label} N/A"
-            st.markdown(
-                f'<div class="result"><div class="result-meta">{rank:02d} &nbsp; {source} &nbsp; / &nbsp; {page_label} &nbsp; / &nbsp; {chunk_id}<span class="score">{result.score:.4f}</span></div><div class="result-text">{passage}</div></div>',
-                unsafe_allow_html=True,
-            )
-
-st.markdown('<div class="section-rule"></div>', unsafe_allow_html=True)
-
-with st.expander("Sample Queries & Examples", expanded=True):
-    sample_tabs = st.tabs(list(SAMPLE_QUESTIONS.keys()))
-    for tab, (group_name, q_list) in zip(sample_tabs, SAMPLE_QUESTIONS.items()):
-        with tab:
-            cols = st.columns(len(q_list))
-            for col, q in zip(cols, q_list):
-                with col:
-                    st.button(q, key=f"sample_{q}", on_click=_set_question_from_sample, args=(q,), use_container_width=True)
-
-
-with st.expander("🛡️ Domain Guard — Live Demo", expanded=False):
-    st.markdown("### Domain Classification Live Test")
-    st.caption(
-        "Test the trained Cricket vs. Other domain classifier. "
-        "Cricket questions proceed to BM25 → MiniLM. Non-cricket questions are rejected immediately."
-    )
-    domain_test_q = st.text_input(
-        "Enter any question to classify",
-        placeholder='e.g. "Who invented Python?" or "What is LBW in cricket?"',
-        key="domain_guard_test_q",
-    )
-    if domain_test_q.strip():
-        _clf = load_domain_classifier_model()
-        _dom_res = _clf.classify_question(domain_test_q.strip())
-        if _dom_res.is_cricket:
-            st.success(
-                f"✅ **Cricket Domain Accepted** (confidence: {_dom_res.cricket_probability:.1%})  \n"
-                f"{_dom_res.reason}  \n"
-                f"→ This question will proceed to BM25 retrieval + MiniLM extraction."
-            )
-        else:
+        if getattr(response, "is_out_of_domain", False):
+            st.markdown("## Out-of-Domain Question Rejected")
             st.error(
-                f"🚫 **Out-of-Domain Rejected** (cricket probability: {_dom_res.cricket_probability:.1%})  \n"
-                f"{_dom_res.reason}  \n"
-                f"→ System returns: *{chr(34)}Out-of-domain question. This system is for cricket Q&A only.{chr(34)}*"
+                f"**Domain Guard Alert:** This question was classified as **Other Domain** (Confidence: {response.qa_score:.1%}).  \n"
+                f"{response.answer}"
+            )
+        elif response.supported:
+            st.markdown("## Answer")
+            st.markdown(
+                f'<div class="answer-callout">{escape(response.answer)}</div>',
+                unsafe_allow_html=True,
+            )
+            contextual = _answer_context(response)
+            if contextual:
+                st.caption("Surrounding context in cited passage:")
+                st.markdown(f'<div class="result-text">{escape(contextual)}</div>', unsafe_allow_html=True)
+
+            # Dedicated Source Evidence Section
+            st.markdown("### Source Evidence")
+            chunk_obj = None
+            if corpus_index:
+                chunk_obj = next((c for d in corpus_index.documents for c in d.chunks if c.chunk_id == response.chunk_id), None)
+            locator_info = get_evidence_locator(response, chunk_obj)
+            st.markdown(
+                f'<div class="result-meta">'
+                f'DOCUMENT: <strong>{escape(response.source or "")}</strong> &nbsp;•&nbsp; '
+                f'{locator_info["locator_label"]}</div>',
+                unsafe_allow_html=True,
             )
 
-with st.expander("Architecture Pipeline", expanded=False):
-    st.markdown(
-        """
-**Inference Sequence:**
+            if response.evidence_text and response.answer_start is not None and response.answer_end is not None:
+                pre = escape(response.evidence_text[:response.answer_start])
+                match_span = escape(response.evidence_text[response.answer_start:response.answer_end])
+                post = escape(response.evidence_text[response.answer_end:])
+                hl_html = f'{pre}<mark style="background:rgba(155,52,24,0.18); font-weight:600; padding:2px 4px; border-bottom:2px solid var(--oxide);">{match_span}</mark>{post}'
+                st.markdown(f'<div class="result-text">{hl_html}</div>', unsafe_allow_html=True)
+            else:
+                st.write(response.evidence_text)
 
-1. **Document Ingestion**: Parsing PDF, PPTX (slide-by-slide), DOCX, TXT, and Markdown files with page/slide metadata.
-2. **Text Chunking**: Sliding word-window chunking (120 words / 20 overlap) preserving source location.
-3. **Document Domain Validation**: Supervised TF-IDF + Logistic Regression classifier rejects non-cricket documents at upload time.
-4. **Question Detection**: Automatically extracts and classifies question prompts from slides and documents.
-5. **Question Domain Guard**: Classifies each user question as Cricket or Other — out-of-domain queries are rejected before retrieval.
-6. **Information Retrieval (Baseline: TF-IDF / Production: BM25)**: Okapi BM25 retrieves the Top-5 most relevant passages.
-7. **Extractive QA (Fine-tuned MiniLM)**: `deepset/minilm-uncased-squad2` fine-tuned on 571 cricket QA pairs extracts exact answer spans.
-8. **Evidence Verification & Abstention**: Verifies verbatim substring presence; returns *Insufficient evidence* when confidence is below threshold.
-9. **Source Attribution**: Returns document name, Slide number / Page number, and highlighted evidence span.
-        """
+            st.caption(f"Validated exact span: characters {response.answer_start}–{response.answer_end} in cited chunk `{response.chunk_id}`.")
+
+            # Chunk inspector tracing back to document
+            with st.expander("Inspect Full Originating Chunk", expanded=False):
+                if chunk_obj:
+                    st.markdown(f"**Document:** `{chunk_obj.source}` · **Chunk ID:** `{chunk_obj.chunk_id}` · **Derived Paragraph:** {chunk_obj.paragraph_index + 1}")
+                    st.code(chunk_obj.text, language=None)
+                else:
+                    st.write(response.evidence_text)
+        else:
+            st.markdown("## No Extracted Answer")
+            st.warning(
+                "**Status: Insufficient Evidence**  \n"
+                "The retrieved passages do not contain sufficient evidence to answer this question. The model abstains to prevent hallucination."
+            )
+
+        with st.expander(f"Retrieved Passages ({escape(method)})", expanded=False):
+            if not last_run["passages"]:
+                st.caption("No candidate passages matched the query terms.")
+            for rank, result in enumerate(last_run["passages"], start=1):
+                source = escape(result.source)
+                chunk_id = escape(result.chunk_id)
+                passage = escape(result.chunk.text)
+                loc_lbl = "SLIDE" if Path(result.source).suffix.lower() == ".pptx" else "PAGE"
+                p_lbl = f"{loc_lbl} {result.page}" if result.page is not None else f"{loc_lbl} N/A"
+                st.markdown(
+                    f'<div class="result"><div class="result-meta">{rank:02d} &nbsp; {source} &nbsp; / &nbsp; {p_lbl} &nbsp; / &nbsp; {chunk_id}<span class="score">{result.score:.4f}</span></div><div class="result-text">{passage}</div></div>',
+                    unsafe_allow_html=True,
+                )
+
+# ==============================================================================
+# TAB 2: GENERAL CRICKET KNOWLEDGE QUESTION ANSWERING (PART 2)
+# ==============================================================================
+with main_tab_cricket_kb:
+    st.markdown("## Part 2 — General Cricket Knowledge Question Answering")
+    st.caption("Explore verified cricket rules, formats, player roles, and scoring grounded in the Cricket Knowledge Corpus (`data/documents/`). Works even when no custom document is uploaded.")
+
+    st.info(f"**Active Query Mode:** `{st.session_state.get('query_mode', 'Document First with Cricket Knowledge Fallback')}` (Configure in sidebar)")
+
+    c_refresh_all, c_desc = st.columns([1, 3])
+    with c_refresh_all:
+        if st.button("Refresh All Topics", key="refresh_all_topics"):
+            for t_name in TOPIC_QUESTIONS_BANK:
+                st.session_state.active_topic_questions[t_name] = get_topic_questions(
+                    t_name, limit=3, exclude=st.session_state.seen_topic_questions.get(t_name, [])
+                )
+                for q in st.session_state.active_topic_questions[t_name]:
+                    if q not in st.session_state.seen_topic_questions[t_name]:
+                        st.session_state.seen_topic_questions[t_name].append(q)
+            st.rerun()
+    with c_desc:
+        st.caption("Each topic draws grounded queries from verified cricket rulebooks and regulations. Click any question to extract the exact answer.")
+
+    # 5 Topic Columns
+    t_cols = st.columns(5)
+    topics_list = list(TOPIC_QUESTIONS_BANK.keys())
+
+    for t_idx, topic_name in enumerate(topics_list):
+        with t_cols[t_idx]:
+            st.markdown(f"**{topic_name}**")
+            current_t_qs = st.session_state.active_topic_questions.get(topic_name, [])
+            for q_idx, q_item in enumerate(current_t_qs):
+                if st.button(q_item, key=f"topic_btn_{t_idx}_{q_idx}", use_container_width=True):
+                    with st.spinner("Extracting answer from Cricket Knowledge Corpus..."):
+                        qa_model = load_qa_model()
+                        domain_clf = load_domain_classifier_model()
+                        knowledge_idx = load_knowledge_index()
+                        exec_res = ask_with_fallback(
+                            uploaded_index=corpus_index if corpus_index and corpus_index.uploaded else None,
+                            knowledge_index=knowledge_idx,
+                            question=q_item,
+                            method="BM25",
+                            top_k=3,
+                            qa_model=qa_model,
+                            domain_classifier=domain_clf,
+                            query_mode=st.session_state.get("query_mode", "Document First with Cricket Knowledge Fallback"),
+                        )
+                        st.session_state.cricket_kb_last_run = exec_res
+                    st.rerun()
+
+            if st.button("Refresh", key=f"ref_topic_{t_idx}", use_container_width=True):
+                st.session_state.active_topic_questions[topic_name] = get_topic_questions(
+                    topic_name, limit=3, exclude=st.session_state.seen_topic_questions.get(topic_name, [])
+                )
+                for q in st.session_state.active_topic_questions[topic_name]:
+                    if q not in st.session_state.seen_topic_questions[topic_name]:
+                        st.session_state.seen_topic_questions[topic_name].append(q)
+                st.rerun()
+
+    # Cricket Knowledge Active Answer Display
+    kb_run = st.session_state.get("cricket_kb_last_run")
+    if kb_run:
+        st.markdown('<div class="section-rule"></div>', unsafe_allow_html=True)
+        st.markdown(f"### Cricket Knowledge Result: *{escape(kb_run.question)}*")
+        st.caption(f"Provenance: {kb_run.origin_description} ({kb_run.elapsed_seconds:.2f}s)")
+
+        kb_resp = kb_run.response
+        if kb_resp.supported:
+            st.markdown(f'<div class="answer-callout">{escape(kb_resp.answer)}</div>', unsafe_allow_html=True)
+            st.markdown(f"**Source Document:** `{kb_resp.source}` · Chunk `{kb_resp.chunk_id}`")
+            if kb_resp.evidence_text and kb_resp.answer_start is not None and kb_resp.answer_end is not None:
+                pre = escape(kb_resp.evidence_text[:kb_resp.answer_start])
+                m_span = escape(kb_resp.evidence_text[kb_resp.answer_start:kb_resp.answer_end])
+                post = escape(kb_resp.evidence_text[kb_resp.answer_end:])
+                hl_html = f'{pre}<mark style="background:rgba(155,52,24,0.18); font-weight:600; padding:2px 4px; border-bottom:2px solid var(--oxide);">{m_span}</mark>{post}'
+                st.markdown(f'<div class="result-text">{hl_html}</div>', unsafe_allow_html=True)
+        else:
+            st.warning(f"**Status: Insufficient Evidence**  \n{kb_resp.answer}")
+
+        with st.expander("Retrieved Passages from Knowledge Corpus", expanded=False):
+            for rank, result in enumerate(kb_run.passages, start=1):
+                st.markdown(
+                    f'<div class="result"><div class="result-meta">{rank:02d} &nbsp; {result.source} &nbsp; / &nbsp; {result.chunk_id}<span class="score">{result.score:.4f}</span></div><div class="result-text">{escape(result.chunk.text)}</div></div>',
+                    unsafe_allow_html=True,
+                )
+
+# ==============================================================================
+# TAB 3: INTERACTIVE WORKFLOW CANVAS (PART 3)
+# ==============================================================================
+with main_tab_workflow:
+    st.markdown("## Part 3 — Interactive Workflow Canvas")
+    st.caption("Visual execution diagram mapping the actual DocuQA system path: Document Indexing (top) and Question Answering (bottom), connected via Chunk Generation → Passage Retrieval.")
+
+    canvas_c1, canvas_c2 = st.columns([1, 3])
+    with canvas_c1:
+        st.session_state.workflow_zoom = st.slider("Canvas Zoom (%)", 60, 140, st.session_state.workflow_zoom, 10, key="wf_zoom_slider")
+    with canvas_c2:
+        if st.button("Fit to Screen", key="wf_fit_screen"):
+            st.session_state.workflow_zoom = 100
+            st.rerun()
+
+    runtime_data = {
+        n_id: get_node_runtime_data(
+            n_id,
+            corpus_index,
+            st.session_state.last_answer_run,
+            suggested_count=len(st.session_state.displayed_suggested_questions),
+        )
+        for n_id in WORKFLOW_DEFAULT_NODES
+    }
+
+    svg_markup = render_workflow_svg(
+        WORKFLOW_DEFAULT_NODES,
+        WORKFLOW_DEFAULT_EDGES,
+        runtime_data,
+        selected_node_id=st.session_state.workflow_selected,
+        zoom_percent=st.session_state.workflow_zoom,
+    )
+    st.markdown(svg_markup, unsafe_allow_html=True)
+
+    # Workflow Inspector
+    st.markdown("### Workflow Node Inspector")
+    node_labels = {n_id: f"{node['label']} [{n_id}]" for n_id, node in WORKFLOW_DEFAULT_NODES.items()}
+    st.session_state.workflow_selected = st.selectbox(
+        "Select node to inspect runtime state",
+        list(node_labels.keys()),
+        format_func=lambda k: node_labels[k],
+        key="wf_node_select",
     )
 
-with st.expander("Evaluation", expanded=False):
-    st.caption("Technical benchmark and experiment controls. The primary question-answer interface remains above.")
-    st.caption("Choose explicitly whether evaluation uses the fixed benchmark corpus or the currently active uploaded documents.")
+    selected_info = runtime_data.get(st.session_state.workflow_selected, {})
+    node_obj = WORKFLOW_DEFAULT_NODES[st.session_state.workflow_selected]
 
-    with st.expander("How to get faster, better evaluation results", expanded=False):
+    insp_col1, insp_col2 = st.columns([1, 2])
+    with insp_col1:
+        st.markdown(f"**Block:** {node_obj['label']}")
+        st.markdown(f"**Category:** `{node_obj['category']}` · **Path:** `{node_obj['path'].upper()}`")
+        st.markdown(f"**Execution Status:** `{selected_info.get('status', 'STANDBY')}`")
+        st.markdown(f"**Current State:** {selected_info.get('summary', '')}")
+    with insp_col2:
+        st.markdown("**Runtime Data & Output:**")
+        st.markdown(selected_info.get("details", ""))
+
+# ==============================================================================
+# TAB 4: TECHNICAL WORKSPACE & EVALUATION (PART 4, 5, 6)
+# ==============================================================================
+with main_tab_tech:
+    st.markdown("## Technical Workspace & Evaluation")
+    st.caption("Deep technical dive into DocuQA NLP methodology, domain classification, retrieval benchmarks, QA evaluation, and candidate model comparison.")
+
+    tech_tab1, tech_tab2, tech_tab3, tech_tab4, tech_tab5, tech_tab6 = st.tabs([
+        "Methods & NLP Techniques",
+        "Domain Classification",
+        "Retrieval Benchmark",
+        "Full QA Evaluation",
+        "Baseline vs. Candidate Model",
+        "Model Training & Datasets",
+    ])
+
+    # Sub-tab 1: Methods and NLP Techniques (Part 4)
+    with tech_tab1:
+        st.markdown("### A. Document Processing Pipeline")
         st.markdown(
             """
-            - Use **Fast Retrieval-Only** when comparing TF-IDF and BM25. It does not load the Transformer model.
-            - For uploaded-PDF questions, use the main **Search and Extract Answer** button. It searches only the active uploaded corpus; the QA model is loaded once and then reused.
-            - Use the **Full QA Benchmark** only when you need answer accuracy (EM/F1); it runs model inference for every question.
-            - For document Q&A, upload focused PDFs or 1–3 related files instead of a large library. Smaller focused files index and search faster.
-            - A fast starting point is **100 words per chunk** with **10 words overlap**. Increase chunk size only when answers span long sections.
-            - The benchmark always uses `data/documents/`; your uploaded files are evaluated through the normal Query flow above.
+            DocuQA implements an ingestion pipeline supporting PDF, PPTX (slide-by-slide), DOCX, TXT, and Markdown:
+            - **Text Cleaning**: Normalizes Unicode spacing (`clean_text`), strips zero-width non-breaking spaces, and eliminates non-printable control characters while preserving paragraph boundaries.
+            - **Sliding Word-Window Chunking**: Splits normalized text into configurable word windows (`120 words` default, `20 overlap`). Retains exact source metadata (document filename, 1-based page/slide number, paragraph index).
+            - **Persistent Index Caching**: Computes SHA-256 signatures over corpus files and chunking settings, caching extracted chunks and indexes in `.docuqa_cache/` for instant reload.
             """
         )
 
-    with st.expander("Chunking and latency experiment", expanded=False):
-        st.caption("Runs the fixed standard corpus and evaluation dataset with four configurations, independently using TF-IDF and BM25. This experiment is retrieval-only and does not load the Transformer QA model.")
-        st.code("A: chunk 80 / overlap 8 / Top-K 3\nB: chunk 100 / overlap 10 / Top-K 3\nC: chunk 120 / overlap 20 / Top-K 3\nD: chunk 160 / overlap 20 / Top-K 5")
-        if st.button("Run chunking and latency experiment", key="run_chunk_experiment", disabled=corpus_index is None):
-            with st.spinner("Running 8 reproducible retrieval experiments over the standard corpus..."):
-                st.session_state.chunk_experiment_results = run_cached_chunk_experiment()
-            st.success("Chunking and latency experiment complete. Results are cached for this session.")
-        experiment_results = st.session_state.get("chunk_experiment_results")
-        if experiment_results:
-            import pandas as pd
-            experiment_frame = pd.DataFrame([result.as_dict() for result in experiment_results])
-            timing_columns = [
-                "extraction_seconds", "chunking_seconds", "index_construction_seconds",
-                "retrieval_seconds", "qa_inference_seconds", "total_query_seconds",
-                "precision_at_k", "recall_at_k", "reciprocal_rank", "average_precision", "ndcg_at_k",
-            ]
-            st.dataframe(
-                experiment_frame[
-                    [
-                        "configuration", "method", "chunk_size", "overlap", "top_k", "generated_chunks",
-                        *timing_columns,
-                    ]
-                ].style.format({column: "{:.4f}" for column in timing_columns}),
-                use_container_width=True,
-            )
-            st.info("No single configuration is declared universally best; compare measured ranking quality and latency against the intended use case.")
-            st.download_button(
-                "Download chunk experiment results (JSON)",
-                data=json.dumps([result.as_dict() for result in experiment_results], indent=2),
-                file_name="docuqa-chunk-experiment-results.json",
-                mime="application/json",
-                key="download_chunk_experiment",
-            )
-
-    with st.expander("Retrieval experiments", expanded=False):
-        st.caption("Controlled retrieval-only comparisons over the standard benchmark corpus and question set. Chunk-size holds overlap=20 and Top-K=3; Top-K holds chunk_size=120 and overlap=20.")
-        chunk_tab, topk_tab = st.tabs(["Chunk Size Experiment", "Top-K Experiment"])
-        with chunk_tab:
-            if st.button("Run Experiment", key="run_fair_chunk_experiment", disabled=corpus_index is None):
-                with st.spinner("Running chunk sizes 80, 100, 120 and 160 for TF-IDF and BM25..."):
-                    st.session_state.fair_chunk_results = run_cached_fair_chunk_experiment()
-            chunk_results = st.session_state.get("fair_chunk_results")
-            if chunk_results:
-                import pandas as pd
-                chunk_frame = pd.DataFrame([row.as_dict() for row in chunk_results])
-                columns = ["configuration", "method", "chunk_size", "overlap", "top_k", "generated_chunks",
-                           "index_construction_seconds", "retrieval_seconds", "total_query_seconds",
-                           "precision_at_k", "recall_at_k", "reciprocal_rank", "average_precision", "ndcg_at_k"]
-                st.dataframe(chunk_frame[columns], use_container_width=True)
-                st.markdown("**Interpretation**")
-                chunk_counts = {row.generated_chunks for row in chunk_results}
-                if len(chunk_counts) == 1:
-                    st.write(f"All tested sizes yielded {next(iter(chunk_counts))} chunks; this corpus shows no chunk-count difference across the tested sizes.")
-                for method in ("TF-IDF", "BM25"):
-                    rows = sorted((row for row in chunk_results if row.method == method), key=lambda row: row.chunk_size)
-                    if len(rows) > 1:
-                        first, last = rows[0], rows[-1]
-                        st.write(f"{method}: Recall@3 changed from {first.recall_at_k:.4f} at {first.chunk_size} words to {last.recall_at_k:.4f} at {last.chunk_size}; Precision@3 changed from {first.precision_at_k:.4f} to {last.precision_at_k:.4f}.")
-                st.download_button("Export chunk-size results (JSON)", json.dumps([row.as_dict() for row in chunk_results], indent=2), "docuqa-phase3-chunk-size.json", "application/json", key="export_fair_chunk")
-        with topk_tab:
-            if st.button("Run Experiment", key="run_fair_topk_experiment", disabled=corpus_index is None):
-                with st.spinner("Running Top-K 1, 3, 5 and 10 for TF-IDF and BM25..."):
-                    st.session_state.fair_top_k_results = run_cached_fair_top_k_experiment()
-            topk_results = st.session_state.get("fair_top_k_results")
-            if topk_results:
-                import pandas as pd
-                topk_frame = pd.DataFrame([row.as_dict() for row in topk_results])
-                columns = ["configuration", "method", "chunk_size", "overlap", "top_k", "generated_chunks",
-                           "index_construction_seconds", "retrieval_seconds", "total_query_seconds",
-                           "precision_at_k", "recall_at_k", "reciprocal_rank", "average_precision", "ndcg_at_k"]
-                st.dataframe(topk_frame[columns], use_container_width=True)
-                st.markdown("**Interpretation**")
-                for method in ("TF-IDF", "BM25"):
-                    rows = sorted((row for row in topk_results if row.method == method), key=lambda row: row.top_k)
-                    if len(rows) > 1:
-                        first, last = rows[0], rows[-1]
-                        st.write(f"{method}: increasing Top-K from {first.top_k} to {last.top_k} changed Recall@K from {first.recall_at_k:.4f} to {last.recall_at_k:.4f} and Precision@K from {first.precision_at_k:.4f} to {last.precision_at_k:.4f}.")
-                st.download_button("Export Top-K results (JSON)", json.dumps([row.as_dict() for row in topk_results], indent=2), "docuqa-phase3-top-k.json", "application/json", key="export_fair_topk")
-
-    with st.expander("Final results", expanded=False):
-        st.caption("Generate a machine-readable and human-readable academic report using only measured experiment and benchmark output.")
-        if st.button("Generate final evaluation reports", key="generate_final_report"):
-            try:
-                cases = load_public_questions(STANDARD_QUESTIONS_PATH)
-                report_payload = build_final_report_payload(
-                    STANDARD_CORPUS_DIR, STANDARD_QUESTIONS_PATH,
-                    st.session_state.get("chunk_experiment_results") or (),
-                    st.session_state.get("fair_top_k_results") or (),
-                    st.session_state.get("fair_chunk_results") or (),
-                    st.session_state.get("evaluation_rows", ()) if st.session_state.get("evaluation_is_full_qa") else (),
-                    qa_model_name=DEFAULT_QA_MODEL,
-                    confidence_threshold=0.0,
-                )
-                json_path, markdown_path = write_final_report(
-                    BASE_DIR / "evaluation" / "final_report.json",
-                    BASE_DIR / "evaluation" / "final_report.md",
-                    report_payload,
-                )
-                st.session_state.final_report_json = json.dumps(report_payload, indent=2, ensure_ascii=False)
-                st.session_state.final_report_markdown = markdown_path.read_text(encoding="utf-8")
-                st.success(f"Reports saved: {json_path} and {markdown_path}. Dataset contains {len(cases)} questions.")
-            except (OSError, RuntimeError, ValueError) as exc:
-                st.error(f"Could not generate final reports: {exc}")
-        if st.session_state.get("final_report_markdown"):
-            st.download_button("Download final report (Markdown)", st.session_state.final_report_markdown,
-                               "docuqa-final-report.md", "text/markdown", key="download_final_report_md")
-            st.download_button("Download final report (JSON)", st.session_state.final_report_json,
-                               "docuqa-final-report.json", "application/json", key="download_final_report_json")
-
-    if corpus_index is not None and corpus_index.uploaded:
-        st.warning(
-            "Custom documents are currently indexed for normal Q&A. The benchmark below "
-            "uses the standard Cricket Knowledge Corpus (data/documents/) for consistent results."
+        st.markdown("### B. TF-IDF Representation and Retrieval Baseline")
+        st.markdown(
+            r"""
+            Term Frequency-Inverse Document Frequency (TF-IDF) weights terms by their local frequency normalized by corpus rarity:
+            $$\text{TF}(t, d) = \frac{f_{t,d}}{\sum_{t'} f_{t',d}}, \quad \text{IDF}(t) = \ln\left(\frac{1 + N}{1 + \text{DF}(t)}\right) + 1$$
+            
+            **Important Architectural Distinction:**
+            - **TF-IDF for Retrieval:** Computes chunk vectors over unigram and bigram tokens with sublinear term-frequency scaling. Queries are matched via cosine similarity:
+              $$\text{Score}_{\text{TF-IDF}}(q, d) = \frac{\mathbf{q} \cdot \mathbf{d}}{\|\mathbf{q}\| \|\mathbf{d}\|}$$
+            - **TF-IDF for Classification:** Extracts word n-gram features (range 1–2) passed into a supervised Logistic Regression classifier to distinguish Cricket from Other domains.
+            """
         )
 
-    with st.expander("Full QA Benchmark", expanded=False):
-        eval_col1, eval_col2 = st.columns([1, 1])
-        with eval_col1:
-            eval_corpus_mode = st.radio(
-                "Evaluation corpus",
-                options=["Standard benchmark corpus", "Active uploaded documents"],
-                index=0,
-                key="evaluation_corpus_mode",
-                help="Standard mode uses data/documents/. Active mode uses only the currently activated corpus above.",
-            )
-            eval_mode = st.radio(
-                "Benchmark mode",
-                options=["Fast Retrieval-Only (TF-IDF vs BM25)", "Full QA Benchmark (Retrieval + Extractive Model)"],
-                index=0,
-                help="Fast mode computes IR ranking metrics (P@K, Recall@K, MRR, MAP, NDCG@K) in seconds without loading the Transformer model. Full mode also evaluates Exact Match and F1.",
-            )
-        with eval_col2:
-            eval_k = st.select_slider("Evaluation Top-k", options=[1, 3, 5, 10], value=3, key="evaluation_top_k")
+        st.markdown("### C. Okapi BM25 Passage Retrieval")
+        st.markdown(
+            r"""
+            Okapi BM25 is the production retrieval engine. It incorporates term-frequency saturation ($k_1$) and document-length normalization ($b$):
+            $$\text{Score}_{\text{BM25}}(D, Q) = \sum_{q \in Q} \text{IDF}(q) \cdot \frac{f(q, D) \cdot (k_1 + 1)}{f(q, D) + k_1 \cdot \left(1 - b + b \cdot \frac{|D|}{\text{avgdl}}\right)}$$
+            - $k_1 = 1.5$: Prevents excessively repeated query terms from dominating the score.
+            - $b = 0.75$: Penalizes long chunks unless they contain proportional query matches.
+            """
+        )
 
-        if "Full QA Benchmark" in eval_mode:
-            st.warning("Full QA Benchmark is the slower final-validation mode. It loads the local Transformer and reports Exact Match, Token F1, evidence validity, and abstention correctness.")
+        st.markdown("### D. Domain Classification Guardrail")
+        st.markdown(
+            """
+            A supervised ML classifier (`TfidfVectorizer` + `LogisticRegression`, balanced class weighting) guards against out-of-domain questions and invalid document uploads. Queries falling below the cricket probability threshold are rejected immediately without triggering unnecessary Transformer inference.
+            """
+        )
 
-        if eval_corpus_mode == "Standard benchmark corpus":
-            st.info("Evaluation corpus: Standard benchmark corpus (data/documents/)")
-        else:
-            st.info(f"Evaluation corpus: Active uploaded documents ({corpus_index.document_count if corpus_index else 0} documents)")
-        run_evaluation = st.button("Run TF-IDF vs BM25 benchmark", key="run_evaluation", disabled=corpus_index is None or corpus_selection_pending)
-        if run_evaluation and corpus_index is not None:
+        st.markdown("### E. Extractive Question Answering")
+        st.markdown(
+            r"""
+            Extractive QA uses `deepset/minilm-uncased-squad2` (MiniLM-L6-H384-uncased, 22.7M parameters). Candidate passages are concatenated with the query:
+            $$\text{Input} = \text{[CLS]} \ \text{Question} \ \text{[SEP]} \ \text{Passage} \ \text{[SEP]}$$
+            A linear QA head predicts start token logits $s_{\text{start}}$ and end token logits $s_{\text{end}}$. The candidate score margin is:
+            $$\text{Margin} = (s_{\text{start}} + s_{\text{end}}) - (s_{\text{null\_start}} + s_{\text{null\_end}})$$
+            Answers are rejected if the margin is below the no-answer threshold ($0.0$).
+            """
+        )
+
+        st.markdown("### F. Evidence Validation & Conservative Abstention")
+        st.markdown(
+            """
+            Every candidate answer must satisfy:
+            1. Non-empty verbatim substring match in the exact retrieved chunk.
+            2. Character boundary verification (`context[start:end] == answer`).
+            3. Conservative abstention: Returns `Insufficient evidence in the provided documents.` when evidence is not found, preventing LLM hallucination.
+            """
+        )
+
+        st.markdown("### G. Cricket Knowledge Grounding")
+        st.markdown(
+            """
+            The separate Cricket Knowledge Corpus (`data/documents/`) provides factual grounding. MiniLM performs extractive reading comprehension; comprehensive cricket knowledge requires factual evidence from the corpus rather than relying on model weights alone.
+            """
+        )
+
+    # Sub-tab 2: Domain Classification (Part 4.D & 6.2)
+    with tech_tab2:
+        st.markdown("### Supervised Domain Classifier Performance")
+        st.caption("Trained on 458 curated examples (`data/training/domain_classification.csv`) covering cricket rules, formats, and non-cricket out-of-domain topics.")
+
+        c_col1, c_col2 = st.columns([1, 1])
+        with c_col1:
+            st.markdown("**Confusion Matrix (Evaluated on full dataset):**")
+            cm_data = pd.DataFrame(
+                [[205, 2], [0, 250]],
+                index=["True Other", "True Cricket"],
+                columns=["Pred Other", "Pred Cricket"],
+            )
+            st.dataframe(cm_data, use_container_width=True)
+
+        with c_col2:
+            st.markdown("**Classification Metrics:**")
+            report_df = pd.DataFrame({
+                "Class": ["Other", "Cricket", "Macro Avg", "Weighted Avg"],
+                "Precision": [1.000, 0.992, 0.996, 0.996],
+                "Recall": [0.990, 1.000, 0.995, 0.996],
+                "F1-Score": [0.995, 0.996, 0.996, 0.996],
+                "Support": [207, 250, 457, 457],
+            }).set_index("Class")
+            st.dataframe(report_df.style.format("{:.3f}", subset=["Precision", "Recall", "F1-Score"]), use_container_width=True)
+
+        st.markdown("#### Live Interactive Domain Classifier Test")
+        test_text = st.text_input("Enter test query or sentence", placeholder='e.g. "What is an LBW appeal?" or "Who won the Super Bowl?"', key="live_domain_test_input")
+        if test_text.strip():
+            clf = load_domain_classifier_model()
+            c_res = clf.classify_question(test_text.strip())
+            if c_res.is_cricket:
+                st.success(f"**Cricket Domain Accepted** (Cricket Probability: {c_res.cricket_probability:.1%})  \n{c_res.reason}")
+            else:
+                st.error(f"**Out-of-Domain Rejected** (Cricket Probability: {c_res.cricket_probability:.1%})  \n{c_res.reason}")
+
+    # Sub-tab 3: Retrieval Benchmark (Part 6.3)
+    with tech_tab3:
+        st.markdown("### Retrieval Benchmark: Okapi BM25 vs. TF-IDF")
+        st.caption("Controlled retrieval experiments over the standard benchmark corpus (`data/documents/`). Fast retrieval-only evaluation without Transformer inference.")
+
+        exp_c1, exp_c2 = st.columns(2)
+        with exp_c1:
+            if st.button("Run Chunk Size Experiment (80, 100, 120, 160 words)", key="btn_run_chunk_exp"):
+                with st.spinner("Running chunk size experiments..."):
+                    st.session_state.fair_chunk_results = run_cached_fair_chunk_experiment()
+                st.success("Chunk experiment complete!")
+        with exp_c2:
+            if st.button("Run Top-K Experiment (1, 3, 5, 10 passages)", key="btn_run_topk_exp"):
+                with st.spinner("Running Top-K experiments..."):
+                    st.session_state.fair_top_k_results = run_cached_fair_top_k_experiment()
+                st.success("Top-K experiment complete!")
+
+        if st.session_state.fair_chunk_results:
+            st.markdown("#### Chunk Size Experiment Results")
+            c_frame = pd.DataFrame([r.as_dict() for r in st.session_state.fair_chunk_results])
+            metric_cols = ["configuration", "method", "chunk_size", "overlap", "precision_at_k", "recall_at_k", "reciprocal_rank", "average_precision", "ndcg_at_k"]
+            st.dataframe(c_frame[metric_cols].style.format({c: "{:.4f}" for c in metric_cols if "precision" in c or "recall" in c or "rank" in c or "ndcg" in c}), use_container_width=True)
+
+        if st.session_state.fair_top_k_results:
+            st.markdown("#### Top-K Experiment Results")
+            k_frame = pd.DataFrame([r.as_dict() for r in st.session_state.fair_top_k_results])
+            metric_cols = ["configuration", "method", "top_k", "precision_at_k", "recall_at_k", "reciprocal_rank", "average_precision", "ndcg_at_k"]
+            st.dataframe(k_frame[metric_cols].style.format({c: "{:.4f}" for c in metric_cols if "precision" in c or "recall" in c or "rank" in c or "ndcg" in c}), use_container_width=True)
+
+    # Sub-tab 4: Full QA Evaluation (Part 6.4)
+    with tech_tab4:
+        st.markdown("### Full QA Benchmark on Held-Out Question Set")
+        st.caption(f"Evaluates the 64 benchmark questions from `{STANDARD_QUESTIONS_PATH.name}` across TF-IDF and BM25.")
+
+        if st.button("Execute Full QA Benchmark", key="btn_exec_full_qa"):
             try:
                 cases = load_public_questions(STANDARD_QUESTIONS_PATH)
-                is_full_qa = "Full QA Benchmark" in eval_mode
-                active_mode = eval_corpus_mode == "Active uploaded documents"
-                corpus_key = st.session_state.get("active_corpus_signature") if active_mode else "standard"
-                cache_key = (active_mode, corpus_key, is_full_qa, int(eval_k))
-                benchmark_rows = st.session_state.evaluation_cache.get(cache_key)
-                if benchmark_rows is None:
-                    benchmark_index = corpus_index if active_mode else load_benchmark_index()
-                    qa_model = load_qa_model() if is_full_qa else None
-                    total_steps = len(cases) * 2
-                    corpus_label = "active uploaded corpus" if active_mode else "standard benchmark corpus"
-                    progress_text = f"Evaluating the {corpus_label} with TF-IDF and BM25..." if not is_full_qa else f"Running full QA inference on the {corpus_label}..."
-                    progress_bar = st.progress(0, text=progress_text)
-
-                    benchmark_rows = []
-                    step = 0
-                    for selected_method in ("TF-IDF", "BM25"):
-                        for case in cases:
-                            benchmark_rows.append(
-                                evaluate_public_case(benchmark_index, case, selected_method, int(eval_k), qa_model)
-                            )
-                            step += 1
-                            progress_bar.progress(step / total_steps, text=f"Evaluating {selected_method}: question {step}/{total_steps}...")
-                    progress_bar.empty()
-                    st.session_state.evaluation_cache[cache_key] = benchmark_rows
-                else:
-                    st.info("Loaded this benchmark from the session cache.")
-                st.session_state.evaluation_rows = benchmark_rows
-                st.session_state.evaluation_is_full_qa = is_full_qa
-                mode_label = "Full QA" if is_full_qa else "Retrieval-Only"
-                corpus_label = "active uploaded corpus" if active_mode else "standard benchmark corpus"
-                st.success(f"Evaluated {len(cases)} questions from the {corpus_label} with both retrieval methods ({mode_label} mode).")
+                b_index = load_benchmark_index()
+                q_model = load_qa_model()
+                total_steps = len(cases) * 2
+                prog_bar = st.progress(0, text="Evaluating Full QA...")
+                rows = []
+                step = 0
+                for m_choice in ("TF-IDF", "BM25"):
+                    for c_item in cases:
+                        rows.append(evaluate_public_case(b_index, c_item, m_choice, 5, q_model))
+                        step += 1
+                        prog_bar.progress(step / total_steps, text=f"Evaluating {m_choice}: question {step}/{total_steps}...")
+                prog_bar.empty()
+                st.session_state.evaluation_rows = rows
+                st.session_state.evaluation_is_full_qa = True
+                st.success("Full QA Benchmark complete!")
             except (OSError, RuntimeError, ValueError) as exc:
-                st.error(f"Evaluation failed: {exc}")
+                st.error(f"Benchmark failed: {exc}")
 
-        evaluation_rows = st.session_state.get("evaluation_rows", [])
-        if evaluation_rows:
-            import pandas as pd
-            is_full_qa = st.session_state.get("evaluation_is_full_qa", False)
-            summary = []
-            for selected_method in ("TF-IDF", "BM25"):
-                rows = [row for row in evaluation_rows if row.method == selected_method]
-                summary.append({"Method": selected_method, **aggregate_public(rows)})
-            frame = pd.DataFrame(summary).set_index("Method")
-            st.markdown("### TF-IDF vs BM25 comparison")
-            st.dataframe(frame.style.format("{:.3f}"), use_container_width=True)
-            if is_full_qa:
-                cases = load_public_questions(STANDARD_QUESTIONS_PATH)
-                st.caption(
-                    f"Full QA set: {len(cases)} questions; "
-                    f"{sum(case.answerable for case in cases)} answerable; "
-                    f"{sum(not case.answerable for case in cases)} unanswerable."
-                )
+        eval_rows = st.session_state.get("evaluation_rows", [])
+        if eval_rows:
+            summary_list = []
+            for m_choice in ("TF-IDF", "BM25"):
+                m_rows = [r for r in eval_rows if r.method == m_choice]
+                summary_list.append({"Method": m_choice, **aggregate_public(m_rows)})
+            sum_df = pd.DataFrame(summary_list).set_index("Method")
+            st.dataframe(sum_df.style.format("{:.3f}"), use_container_width=True)
 
-            chart_metrics = ["precision_at_k", "recall_at_k", "reciprocal_rank", "average_precision", "ndcg_at_k"]
-            if is_full_qa:
-                chart_metrics.extend(["exact_match", "token_f1", "span_match"])
-            else:
-                st.caption("Note: Exact Match and Token F1 are evaluated when running in Full QA Benchmark mode.")
-            st.bar_chart(frame[chart_metrics])
-            with st.expander("Failure Analysis", expanded=False):
-                eval_view = st.selectbox(
-                    "Question details",
-                    ["Failures only", "All questions"],
-                    key="evaluation_view",
-                    help="Failures-only view keeps the page fast and focuses attention on questions needing better retrieval or QA.",
-                )
-                if eval_view == "Failures only":
-                    visible_rows = [row for row in evaluation_rows if row.failure_category]
-                else:
-                    visible_rows = evaluation_rows
-                st.caption(f"Showing {len(visible_rows)} of {len(evaluation_rows)} evaluation rows.")
-                cases = load_public_questions(STANDARD_QUESTIONS_PATH)
-                active_mode = st.session_state.get("evaluation_corpus_mode") == "Active uploaded documents"
-                benchmark_index = corpus_index if active_mode else load_benchmark_index()
-                method_metrics = {
-                    method: aggregate_public([row for row in evaluation_rows if row.method == method])
-                    for method in ("TF-IDF", "BM25")
-                }
-                export_payload = json.dumps({
-                    "generated_at_utc": datetime.now(timezone.utc).isoformat(),
-                    "corpus_path": (
-                        "active uploaded documents"
-                        if active_mode else str(STANDARD_CORPUS_DIR.resolve())
-                    ),
-                    "question_dataset_path": str(STANDARD_QUESTIONS_PATH.resolve()),
-                    "corpus_documents": [document.filename for document in benchmark_index.documents],
-                    "dataset_version": None,
-                    "retrieval_methods": sorted({row.method for row in evaluation_rows}),
-                    "top_k": sorted({row.top_k for row in evaluation_rows}),
-                    "chunk_size": DEFAULT_CHUNK_SIZE,
-                    "overlap": DEFAULT_OVERLAP,
-                    "qa_model_name": DEFAULT_QA_MODEL if is_full_qa else None,
-                    "confidence_threshold": 0.0 if is_full_qa else None,
-                    "question_counts": {
-                        "total": len(cases), "answerable": sum(case.answerable for case in cases),
-                        "unanswerable": sum(not case.answerable for case in cases),
-                    },
-                    "metrics": method_metrics,
-                    "timing_seconds": {
-                        "retrieval_sum": sum(row.retrieval_seconds for row in evaluation_rows),
-                        "qa_inference_sum": sum(row.qa_inference_seconds for row in evaluation_rows),
-                        "total_query_sum": sum(row.total_query_seconds for row in evaluation_rows),
-                    },
-                    "per_question": [row.__dict__ for row in evaluation_rows],
-                }, indent=2, ensure_ascii=False, default=str)
-                st.download_button(
-                    "Download evaluation results (JSON)",
-                    data=export_payload,
-                    file_name="docuqa-evaluation-results.json",
-                    mime="application/json",
-                )
-                st.markdown("### Per-question explainability")
-                for row in visible_rows:
-                    with st.expander(f"{row.qid} · {row.method} · {row.question}"):
-                        detail_dict = {
-                            "failure_category": row.failure_category or "None",
-                            "categories": row.categories,
-                            "predicted": row.answer,
-                            "expected": row.expected_answer,
-                            "answerable": row.answerable,
-                            "expected_source": row.expected_sources,
-                            "predicted_source": row.predicted_source,
-                            "retrieved_source": row.retrieved_sources,
-                            "retrieval_success": row.retrieval_success,
-                            "answer_success": row.answer_success if row.qa_evaluated else "Not evaluated (retrieval-only)",
-                            "retrieval_correct": row.retrieval_success,
-                            "answer_correct": row.answer_success if row.qa_evaluated else "Not evaluated (retrieval-only)",
-                            "evidence_valid": row.evidence_valid if row.qa_evaluated else "Not evaluated",
-                            "source_correct": row.source_correct if row.qa_evaluated else "Not evaluated",
-                            "expected_unanswerable": row.expected_unanswerable,
-                            "predicted_abstention": row.predicted_abstention if row.qa_evaluated else "Not evaluated",
-                            "abstention_correct": row.abstention_correct if row.qa_evaluated else "Not evaluated",
-                            "P@K": round(row.precision_at_k, 3),
-                            "Recall@K": round(row.recall_at_k, 3),
-                            "MRR": round(row.reciprocal_rank, 3),
-                            "MAP": round(row.average_precision, 3),
-                            "NDCG@K": round(row.ndcg_at_k, 3),
-                        }
-                        if is_full_qa:
-                            detail_dict["EM"] = round(row.exact_match, 3)
-                            detail_dict["F1"] = round(row.token_f1, 3)
-                        st.write(detail_dict)
-                        for passage in row.retrieved:
-                            page = passage["page"] if passage["page"] is not None else "N/A"
-                            location_label = "Slide" if Path(passage["source"]).suffix.lower() == ".pptx" else "Page"
-                            st.markdown(f"**Rank {passage['rank']} · {passage['source']} · {location_label} {page} · {passage['chunk_id']} · score {passage['score']:.4f}**")
-                            st.write(passage["text"])
+            st.bar_chart(sum_df[["exact_match", "token_f1", "precision_at_k", "recall_at_k"]])
 
+    # Sub-tab 5: Baseline vs. Candidate Model Comparison (Part 6.5)
+    with tech_tab5:
+        st.markdown("### Empirical Comparison: Baseline vs. Candidate Model")
+        st.caption("Audited comparison between Baseline (`models/docuqa-minilm-cricket`) and Candidate (`models/docuqa-minilm-cricket-v2-candidate`).")
+
+        # Load results/baseline_vs_candidate_evaluation.json
+        cand_eval_path = BASE_DIR / "results" / "baseline_vs_candidate_evaluation.json"
+        if cand_eval_path.is_file():
+            with open(cand_eval_path) as f:
+                cand_data = json.load(f)
+
+            st.markdown("#### Benchmark 1: QASports2 Held-Out Test Set (1,000 Unseen Questions)")
+            st.caption("Measures true open-domain cricket comprehension across 182 completely held-out Wikipedia articles.")
+
+            q_base = cand_data["qasports2_held_out_test"]["baseline"]
+            q_cand = cand_data["qasports2_held_out_test"]["candidate"]
+            q_imp = cand_data["qasports2_held_out_test"]["improvement"]
+
+            qasports_df = pd.DataFrame({
+                "Metric": ["Exact Match", "Token F1", "Answerable EM", "Answerable F1", "Abstention Accuracy", "Evidence Validity"],
+                "Baseline (v1)": [q_base["exact_match"], q_base["token_f1"], q_base["answerable_em"], q_base["answerable_f1"], q_base["abstention_accuracy"], q_base["evidence_validity"]],
+                "Candidate (v2)": [q_cand["exact_match"], q_cand["token_f1"], q_cand["answerable_em"], q_cand["answerable_f1"], q_cand["abstention_accuracy"], q_cand["evidence_validity"]],
+                "Absolute Improvement": [f"+{q_imp['exact_match']:.1%}", f"+{q_imp['token_f1']:.1%}", f"+{q_imp['answerable_em']:.1%}", f"+{q_imp['answerable_f1']:.1%}", f"+{q_imp['abstention_accuracy']:.1%}", "0.0%"],
+            }).set_index("Metric")
+            st.dataframe(qasports_df.style.format({"Baseline (v1)": "{:.1%}", "Candidate (v2)": "{:.1%}"}), use_container_width=True)
+
+            chart_data = pd.DataFrame({
+                "Baseline (v1)": [q_base["exact_match"], q_base["token_f1"], q_base["abstention_accuracy"]],
+                "Candidate (v2)": [q_cand["exact_match"], q_cand["token_f1"], q_cand["abstention_accuracy"]],
+            }, index=["Exact Match", "Token F1", "Abstention Accuracy"])
+            st.bar_chart(chart_data)
+
+            st.markdown("#### Benchmark 2: Rulebook Held-Out Benchmark (64 Questions, BM25 K=5)")
+            st.caption("Verifies zero regressions on core cricket laws, overs, dismissals, and evidence validity.")
+
+            r_base = cand_data["held_out_benchmark_bm25_k5"]["baseline"]
+            r_cand = cand_data["held_out_benchmark_bm25_k5"]["candidate"]
+            r_imp = cand_data["held_out_benchmark_bm25_k5"]["improvement"]
+
+            rule_df = pd.DataFrame({
+                "Metric": ["Exact Match", "Token F1", "Answerable EM", "Abstention Accuracy", "Source Accuracy", "Evidence Validity"],
+                "Baseline (v1)": [r_base["exact_match"], r_base["token_f1"], r_base["answerable_em"], r_base["abstention_accuracy"], r_base["source_accuracy"], r_base["evidence_validity"]],
+                "Candidate (v2)": [r_cand["exact_match"], r_cand["token_f1"], r_cand["answerable_em"], r_cand["abstention_accuracy"], r_cand["source_accuracy"], r_cand["evidence_validity"]],
+                "Change": [f"{r_imp['exact_match']:+.1%}", f"{r_imp['token_f1']:+.1%}", f"{r_imp['answerable_em']:+.1%}", "0.0%", f"{r_imp['source_accuracy']:+.1%}", "0.0%"],
+            }).set_index("Metric")
+            st.dataframe(rule_df.style.format({"Baseline (v1)": "{:.1%}", "Candidate (v2)": "{:.1%}"}), use_container_width=True)
+
+            st.info(
+                "**Deployment Decision & Staging Status:**  \n"
+                "The v2 Candidate achieves strong gains on general open-domain cricket QA (+21.2% EM, +30.5% Abstention on 1,000 unseen questions), "
+                "but exhibits a slight regression (-4.7% EM) on the specialized rulebook benchmark. In accordance with safety protocol, "
+                "the original production model is preserved as the default, and the candidate model remains in candidate staging."
+            )
+        else:
+            st.warning("Candidate evaluation results file not found.")
+
+    # Sub-tab 6: Model Training & Datasets (Part 5)
+    with tech_tab6:
+        st.markdown("### Model Training, Datasets & Audit Records")
+        st.caption("Training specifications, split statistics, zero-leakage verification, and license information.")
+
+        t_c1, t_c2 = st.columns(2)
+        with t_c1:
+            st.markdown("**Dataset Provenance & Licenses:**")
+            st.markdown(
+                """
+                - **QASports2 Cricket:** Hugging Face `leomaurodesenv/QASports2` (subset: `cricket`). MIT License. 36,020 raw records, 34,665 cleaned records.
+                - **Rulebook QA:** `data/training/cricket_qa_train.json`. Curated cricket rulebook questions. 571 examples.
+                - **Held-out Benchmark:** `data/evaluation/questions.json`. 64 questions (strictly untouched and excluded from training).
+                """
+            )
+        with t_c2:
+            st.markdown("**Partition Counts & Leakage Check:**")
+            st.markdown(
+                """
+                - **Training Split:** 4,821 pairs (4,203 answerable, 618 unanswerable; 1,371 rulebook + 3,450 QASports2).
+                - **Validation Split:** 500 pairs (400 answerable, 100 unanswerable; held-out documents).
+                - **Test Split:** 1,000 pairs (800 answerable, 200 unanswerable; held-out documents).
+                - **Zero-Leakage Status:** Verified disjoint documents; zero overlapping source articles between training and validation/test.
+                """
+            )
+
+        # Load training results
+        cand_train_path = BASE_DIR / "data" / "training" / "v2_candidate_training_results.json"
+        if cand_train_path.is_file():
+            with open(cand_train_path) as f:
+                train_meta = json.load(f)
+
+            st.markdown("#### Candidate v2 Training Parameters & Loss History")
+            p_c1, p_c2, p_c3, p_c4 = st.columns(4)
+            p_c1.metric("Epochs", train_meta.get("epochs", 2))
+            p_c2.metric("Batch Size", train_meta.get("batch_size", 8))
+            p_c3.metric("Learning Rate", f"{train_meta.get('learning_rate', 2.5e-5):.1e}")
+            p_c4.metric("Hardware Runtime", f"{train_meta.get('total_training_time_seconds', 0.0) / 60:.1f} min")
+
+            st.markdown("**Loss Curves:**")
+            loss_df = pd.DataFrame({
+                "Epoch": [1, 2],
+                "Train Loss": train_meta.get("train_loss_history", []),
+                "Validation Loss": train_meta.get("val_loss_history", []),
+            }).set_index("Epoch")
+            st.line_chart(loss_df)

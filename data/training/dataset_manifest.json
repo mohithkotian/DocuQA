@@ -1,0 +1,54 @@
+{
+  "dataset_name": "DocuQA Cricket Combined Training & Evaluation Suite",
+  "version": "2.0.0",
+  "created_at": "2026-10-26",
+  "sources": {
+    "existing_rulebook_qa": {
+      "path": "data/training/cricket_qa_train.json",
+      "sha256": "0860C0DB296DB2F309435F15B9812F02043B54A673538AF59D9E70A2CB1931AE",
+      "total_examples": 571,
+      "status": "PRISTINE_UNTOUCHED"
+    },
+    "held_out_benchmark": {
+      "path": "data/evaluation/questions.json",
+      "sha256": "FEAB5AC5EE245040082897435BC7CCE99A3FD54F25DA71577928D7A2414F4F13",
+      "total_questions": 64,
+      "status": "PRISTINE_UNTOUCHED_HELD_OUT"
+    },
+    "qasports2_cricket_source": {
+      "hf_repo": "leomaurodesenv/QASports2",
+      "subset": "cricket",
+      "license": "MIT",
+      "raw_records": 36020,
+      "filtered_records": 34665,
+      "unique_documents": 1809
+    }
+  },
+  "artifacts_generated": {
+    "qasports2_cricket_val": {
+      "path": "data/training/qasports2_cricket_val.json",
+      "sha256": "FEA7480BCD31A9CC8BCD6960C201207013A0FFF9C8FF8FDD22D8D9BF5F823806",
+      "total_examples": 500,
+      "answerable": 400,
+      "unanswerable": 100,
+      "leakage_status": "ZERO_LEAKAGE_HELD_OUT_DOCUMENTS"
+    },
+    "qasports2_cricket_test": {
+      "path": "data/training/qasports2_cricket_test.json",
+      "sha256": "5F7A4E21CE4F1ECEC18D6626111D00A584A2FA44CC095E51C8C694BC2AFEC66C",
+      "total_examples": 1000,
+      "answerable": 800,
+      "unanswerable": 200,
+      "leakage_status": "ZERO_LEAKAGE_HELD_OUT_DOCUMENTS"
+    },
+    "cricket_combined_train": {
+      "path": "data/training/cricket_combined_train.json",
+      "sha256": "0958A937FF7017881504B5AAA6AC83891151FF3A0690E5795401F3C5038BDE7E",
+      "total_examples": 4821,
+      "answerable": 4203,
+      "unanswerable": 618,
+      "existing_rulebook_weighted_instances": 1371,
+      "qasports2_sampled_instances": 3450
+    }
+  }
+}

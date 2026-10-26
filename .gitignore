@@ -26,9 +26,9 @@ htmlcov/
 .streamlit-smoke.log
 .docuqa_cache/
 models/
-results/
-results-*/
-evaluation/
+/results/
+/results-*/
+/evaluation/
 *.zip
 
 # Temporary agent / sandbox outputs

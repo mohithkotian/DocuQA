@@ -1,0 +1,50 @@
+{
+  "candidate_model": "models/docuqa-minilm-cricket-v2-candidate",
+  "base_checkpoint": "models/docuqa-minilm-cricket",
+  "training_dataset": "data/training/cricket_combined_train.json",
+  "validation_dataset": "data/training/qasports2_cricket_val.json",
+  "seed": 42,
+  "epochs": 2,
+  "best_epoch": 2,
+  "learning_rate": 2.5e-05,
+  "batch_size": 8,
+  "weight_decay": 0.01,
+  "warmup_ratio": 0.1,
+  "device": "mps",
+  "total_training_time_seconds": 1339.8809871673584,
+  "pre_training_val_metrics": {
+    "exact_match": 0.522,
+    "token_f1": 0.6312419234360411,
+    "answerable_em": 0.635,
+    "answerable_f1": 0.7715524042950515,
+    "abstention_accuracy": 0.07
+  },
+  "train_loss_history": [
+    0.9661709937339596,
+    0.6548868253715893
+  ],
+  "val_loss_history": [
+    1.1870595507678532,
+    1.3038727869353597
+  ],
+  "val_metrics_history": [
+    {
+      "exact_match": 0.68,
+      "token_f1": 0.701899066293184,
+      "answerable_em": 0.77,
+      "answerable_f1": 0.79737383286648,
+      "abstention_accuracy": 0.32
+    },
+    {
+      "exact_match": 0.708,
+      "token_f1": 0.7295863678804856,
+      "answerable_em": 0.7875,
+      "answerable_f1": 0.8144829598506069,
+      "abstention_accuracy": 0.39
+    }
+  ],
+  "best_val_f1": 0.7295863678804856,
+  "best_val_loss": 1.3038727869353597,
+  "platform": "macOS-27.0-arm64-arm-64bit-Mach-O",
+  "torch_version": "2.14.1"
+}
